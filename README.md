@@ -113,6 +113,6 @@ Use the following credentials to log in as an Admin:
 
 Username: admin@gmail.com
 
-Password: Raktim123456
+Password: zidio1234
 
 
