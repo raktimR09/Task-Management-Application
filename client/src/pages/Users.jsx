@@ -2,12 +2,15 @@ import React, { useState } from "react";
 import Title from "../components/Title";
 import Button from "../components/Button";
 import { IoMdAdd } from "react-icons/io";
-import { summary } from "../assets/data";
 import { getInitials } from "../utils";
 import clsx from "clsx";
 import ConfirmatioDialog, { UserAction } from "../components/Dialogs";
 import AddUser from "../components/AddUser";
-import { useDeleteUserMutation, useGetTeamListQuery, useUserActionMutation } from "../redux/slices/api/userApiSlice";
+import {
+  useDeleteUserMutation,
+  useGetTeamListQuery,
+  useUserActionMutation,
+} from "../redux/slices/api/userApiSlice";
 import { toast } from "sonner";
 
 const Users = () => {
@@ -16,50 +19,45 @@ const Users = () => {
   const [openAction, setOpenAction] = useState(false);
   const [selected, setSelected] = useState(null);
 
-  const {data,isLoading,refetch}=useGetTeamListQuery();
-  const [deleteUser]=useDeleteUserMutation();
-  const [userAction]=useUserActionMutation();
+  const { data, isLoading, refetch } = useGetTeamListQuery();
+  const [deleteUser] = useDeleteUserMutation();
+  const [userAction] = useUserActionMutation();
 
   const userActionHandler = async () => {
     if (!selected?._id) {
-        toast.error("User ID is missing!");
-        console.error("❌ Missing User ID. Cannot update.");
-        return;
+      toast.error("User ID is missing!");
+      console.error("❌ Missing User ID. Cannot update.");
+      return;
     }
 
     const payload = {
-        isActive: selected?.isActive !== undefined ? !selected.isActive : true,
-        id: selected._id, // ✅ Ensuring id is always present
+      isActive: selected?.isActive !== undefined ? !selected.isActive : true,
+      id: selected._id,
     };
 
-    console.log("Sending request with payload:", payload); // ✅ Debugging
-
     try {
-        const result = await userAction(payload).unwrap();
-        console.log("API Response:", result); // ✅ Debugging
-
-        refetch();
-        toast.success(result.message);
-        setSelected(null);
-        setTimeout(() => {
-            setOpenAction(false);
-        }, 500);
+      const result = await userAction(payload).unwrap();
+      refetch();
+      toast.success(result.message);
+      setSelected(null);
+      setTimeout(() => {
+        setOpenAction(false);
+      }, 500);
     } catch (error) {
-        console.error("❌ API Error:", error);
-        toast.error(error.data?.message || "Something went wrong!");
+      console.error("❌ API Error:", error);
+      toast.error(error.data?.message || "Something went wrong!");
     }
-};
+  };
 
-
-  const deleteHandler = async() => {
+  const deleteHandler = async () => {
     try {
-      const result=await deleteUser(selected);
+      const result = await deleteUser(selected);
       refetch();
       toast.success("Deleted Successfully!");
       setSelected(null);
-      setTimeout(()=>{
+      setTimeout(() => {
         setOpenAction(false);
-      },500);
+      }, 500);
     } catch (error) {
       console.log(error);
       toast.error("Something went wrong!");
@@ -76,18 +74,21 @@ const Users = () => {
     setOpen(true);
   };
 
-  const userStatusClick=(el)=>{
+  const userStatusClick = (el) => {
     setSelected(el);
     setOpenAction(true);
-  }
+  };
+
   const TableHeader = () => (
     <thead className='border-b border-gray-300'>
       <tr className='text-black text-left'>
-        <th className='py-2'>Full Name</th>
-        <th className='py-2'>Title</th>
-        <th className='py-2'>Email</th>
-        <th className='py-2'>Role</th>
-        <th className='py-2'>Active</th>
+        <th className='py-2 px-5'>Full Name</th>
+        <th className='py-2 px-5'>Title</th>
+        <th className='py-2 px-5'>Email</th>
+        <th className='py-2 px-5'>Role</th>
+        <th className='py-2'>Gender</th> {/* 👈 Added gender column */}
+        <th className='py-2 px-5'>Active</th>
+        <th className='py-2 px-5 text-right'>Actions</th>
       </tr>
     </thead>
   );
@@ -106,10 +107,11 @@ const Users = () => {
       </td>
 
       <td className='p-2'>{user.title}</td>
-      <td className='p-2'>{user.email || "user.emal.com"}</td>
+      <td className='p-2'>{user.email || "user.email.com"}</td>
       <td className='p-2'>{user.role}</td>
+      <td className='p-2 capitalize'>{user.gender || "N/A"}</td> {/* 👈 Added gender cell */}
 
-      <td>
+      <td className='p-2'>
         <button
           onClick={() => userStatusClick(user)}
           className={clsx(
@@ -143,7 +145,7 @@ const Users = () => {
     <>
       <div className='w-full md:px-1 px-0 mb-6'>
         <div className='flex items-center justify-between mb-8'>
-          <Title title='  Team Members' />
+          <Title title='Team Members' />
           <Button
             label='Add New User'
             icon={<IoMdAdd className='text-lg' />}

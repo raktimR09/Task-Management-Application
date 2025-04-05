@@ -5,7 +5,7 @@ import Notice from "../models/notification.js";
 
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, isAdmin, role, title } = req.body;
+    const { name, email, password, isAdmin, role, title, gender } = req.body; // ➕ Added gender
 
     const userExist = await User.findOne({ email });
 
@@ -23,6 +23,7 @@ export const registerUser = async (req, res) => {
       isAdmin,
       role,
       title,
+      gender,
     });
 
     if (user) {
@@ -41,6 +42,7 @@ export const registerUser = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
 
 export const loginUser = async (req, res) => {
   try {
@@ -96,7 +98,7 @@ export const logoutUser = async (req, res) => {
 
 export const getTeamList = async (req, res) => {
   try {
-    const users = await User.find().select("name title role email isActive");
+    const users = await User.find().select("name title role email isActive gender");
 
     res.status(200).json(users);
   } catch (error) {
@@ -139,6 +141,7 @@ export const updateUserProfile = async (req, res) => {
       user.name = req.body.name || user.name;
       user.title = req.body.title || user.title;
       user.role = req.body.role || user.role;
+      user.gender = req.body.gender || user.gender; // ➕ Added gender update
 
       const updatedUser = await user.save();
 
@@ -157,6 +160,7 @@ export const updateUserProfile = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
 
 export const markNotificationRead = async (req, res) => {
   try {

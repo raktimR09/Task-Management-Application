@@ -169,7 +169,7 @@ const Dashboard = () => {
     },
     {
       _id: "2",
-      label: "COMPLTED TASK",
+      label: "COMPLETED TASK",
       total: totals["completed"] || 0,
       icon: <MdAdminPanelSettings />,
       bg: "bg-[#0f766e]",
@@ -184,11 +184,19 @@ const Dashboard = () => {
     {
       _id: "4",
       label: "TODOS",
-      total: totals["todo"],
+      total: totals["todo"] || 0,
       icon: <FaArrowsToDot />,
-      bg: "bg-[#be185d]" || 0,
+      bg: "bg-[#be185d]",
+    },
+    {
+      _id: "5",
+      label: "OVERDUE TASKS",
+      total: totals["overdue"] || 0,
+      icon: <MdKeyboardArrowDown />,
+      bg: "bg-[#dc2626]",
     },
   ];
+
 
   const Card = ({ label, count, bg, icon }) => {
     return (
@@ -212,11 +220,12 @@ const Dashboard = () => {
   };
   return (
     <div className='h-full py-4'>
-      <div className='grid grid-cols-1 md:grid-cols-4 gap-5'>
-        {stats.map(({ icon, bg, label, total }, index) => (
-          <Card key={index} icon={icon} bg={bg} label={label} count={total} />
-        ))}
-      </div>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4'>
+  {stats.map(({ icon, bg, label, total }, index) => (
+    <Card key={index} icon={icon} bg={bg} label={label} count={total} />
+  ))}
+</div>
+
 
       <div className='w-full bg-white my-16 p-4 rounded shadow-sm'>
         <h4 className='text-xl text-gray-600 font-semibold'>

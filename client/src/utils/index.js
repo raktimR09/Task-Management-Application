@@ -1,12 +1,14 @@
-export const formatDate = (date) => {
-  // Get the month, day, and year
-  const month = date.toLocaleString("en-US", { month: "short" });
-  const day = date.getDate();
-  const year = date.getFullYear();
+export const formatDate = (value) => {
+  if (!value) return "N/A";
 
-  const formattedDate = `${day}-${month}-${year}`;
+  const date = new Date(value);
+  if (isNaN(date)) return "Invalid Date";
 
-  return formattedDate;
+  return date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 export function dateFormatter(dateString) {

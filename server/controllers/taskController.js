@@ -3,36 +3,34 @@ import Task from "../models/task.js";
 import User from "../models/user.js";
 
 export const createTask = async (req, res) => {
-  console.log("check")
   try {
-    console.log("Request Body:", req.body);  // ✅ Debugging
-    console.log("User ID:", req.user);       // ✅ Check if `req.user` exists
+    const { title, team, stage, deadline, assets } = req.body;
 
-    // const { userId } = req.user;
-    const { title, team, stage, date, priority, assets } = req.body;
-
-    if (!title || !team || !stage || !date || !priority) {
+    if (!title || !team || !stage || !deadline) {
       return res.status(400).json({ status: false, message: "Missing required fields." });
     }
-    
+
+    const createdAt = new Date();
+    const deadlineDate = new Date(deadline);
+
     const task = await Task.create({
       title,
       team,
       stage: stage.toLowerCase(),
-      date,
-      priority: priority.toLowerCase(),
+      deadline: deadlineDate,
+      createdAt,
       assets,
-      activities: [{ type: "assigned", activity: "Task created"}],
+      activities: [{ type: "assigned", activity: "Task created" }],
     });
 
-    console.log(task);
-
-     return res.status(200).json({ status: true,task, message: "Task created successfully.", task }).end();
+    return res.status(200).json({ status: true, task, message: "Task created successfully." });
   } catch (error) {
     console.error("Task Creation Error:", error.message);
     return res.status(500).json({ status: false, message: error.message });
   }
 };
+
+
 
 
 export const duplicateTask = async (req, res) => {
@@ -265,27 +263,29 @@ export const createSubTask = async (req, res) => {
 export const updateTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, date, team, stage, priority, assets } = req.body;
+    const { title, date, team, stage, assets } = req.body;
 
     const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found" });
+    }
 
-    task.title = title;
-    task.date = date;
-    task.priority = priority.toLowerCase();
-    task.assets = assets;
-    task.stage = stage.toLowerCase();
-    task.team = team;
+    if (title) task.title = title;
+    if (date) task.deadline = new Date(date); // Ensure deadline updates correctly
+    if (stage) task.stage = stage.toLowerCase();
+    if (assets) task.assets = assets;
+    if (team) task.team = team;
 
     await task.save();
 
-    res
-      .status(200)
-      .json({ status: true, message: "Task duplicated successfully." });
+    res.status(200).json({ status: true, message: "Task updated successfully." });
   } catch (error) {
     console.log(error);
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
+
 
 export const trashTask = async (req, res) => {
   try {

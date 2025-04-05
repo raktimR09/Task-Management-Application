@@ -13,7 +13,7 @@ import { setCredentials } from "../redux/slices/authSlice";
 
 const AddUser = ({ open, setOpen, userData }) => {
   let defaultValues = userData ?? {};
-  const {user}=useSelector((state)=>state.auth);
+  const { user } = useSelector((state) => state.auth);
 
   const {
     register,
@@ -21,27 +21,27 @@ const AddUser = ({ open, setOpen, userData }) => {
     formState: { errors },
   } = useForm({ defaultValues });
 
-  const dispatch=useDispatch();
+  const dispatch = useDispatch();
 
-  const [addNewUser,{isLoading}]=useRegisterMutation();
-
-  const[updateUser,{isLoading:isUpdating}]=useUpdateUserMutation();
+  const [addNewUser, { isLoading }] = useRegisterMutation();
+  const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
 
   const handleOnSubmit = async (data) => {
-  
     try {
       if (userData) {
-        const result=await updateUser(data).unwrap();
+        const result = await updateUser(data).unwrap();
         toast.success(result?.message);
-        if(userData?._id===user._id){
-          dispatch(setCredentials({...result.user}))
+        if (userData?._id === user._id) {
+          dispatch(setCredentials({ ...result.user }));
         }
-      }else{
-        const result = await addNewUser({ ...data, 
-          password: String(data.email)}).unwrap();
+      } else {
+        const result = await addNewUser({
+          ...data,
+          password: String(data.email),
+        }).unwrap();
         toast.success("New user added successfully");
       }
-  
+
       setTimeout(() => {
         setOpen(false);
       }, 1500);
@@ -51,7 +51,6 @@ const AddUser = ({ open, setOpen, userData }) => {
       console.error("Error details:", error.data);
     }
   };
-   
 
   return (
     <>
@@ -97,7 +96,6 @@ const AddUser = ({ open, setOpen, userData }) => {
               })}
               error={errors.email ? errors.email.message : ""}
             />
-
             <Textbox
               placeholder='Role'
               type='text'
@@ -109,6 +107,30 @@ const AddUser = ({ open, setOpen, userData }) => {
               })}
               error={errors.role ? errors.role.message : ""}
             />
+
+            {/* Gender Dropdown */}
+            <div className='flex flex-col gap-1'>
+              <label className='text-sm font-medium text-gray-700'>
+                Gender
+              </label>
+              <select
+                name='gender'
+                {...register("gender", {
+                  required: "Gender is required",
+                })}
+                className='border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500'
+              >
+                <option value=''>Select Gender</option>
+                <option value='Male'>Male</option>
+                <option value='Female'>Female</option>
+                <option value='Other'>Other</option>
+              </select>
+              {errors.gender && (
+                <p className='text-sm text-red-500 mt-1'>
+                  {errors.gender.message}
+                </p>
+              )}
+            </div>
           </div>
 
           {isLoading || isUpdating ? (
@@ -119,7 +141,7 @@ const AddUser = ({ open, setOpen, userData }) => {
             <div className='py-3 mt-4 sm:flex sm:flex-row-reverse'>
               <Button
                 type='submit'
-                className='bg-blue-600 px-8 text-sm font-semibold text-white hover:bg-blue-700  sm:w-auto'
+                className='bg-blue-600 px-8 text-sm font-semibold text-white hover:bg-blue-700 sm:w-auto'
                 label='Submit'
               />
 

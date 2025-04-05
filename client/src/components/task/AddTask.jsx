@@ -6,32 +6,31 @@ import { useForm } from "react-hook-form";
 import UserList from "./UserList";
 import SelectList from "../SelectList";
 import Button from "../Button";
-import { useCreateTaskMutation, useUpdateTaskMutation } from "../../redux/slices/api/taskApiSlice";
+import {
+  useCreateTaskMutation,
+  useUpdateTaskMutation,
+} from "../../redux/slices/api/taskApiSlice";
 import { toast } from "sonner";
 import { dateFormatter } from "../../utils";
 
 const LISTS = ["TODO", "IN PROGRESS", "COMPLETED"];
-const PRIORIRY = ["HIGH", "MEDIUM", "NORMAL", "LOW"];
 
 const AddTask = ({ open, setOpen, task }) => {
-  const defaultValues={
-    title:task?.title||"",
-    date: dateFormatter(task?.date||new Date()),
-    team:[],
-    stage:"",
-    priority:"",
+  const defaultValues = {
+    title: task?.title || "",
+    deadline: dateFormatter(task?.deadline || new Date()),
+    team: [],
+    stage: "",
   };
+
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({defaultValues});
+  } = useForm({ defaultValues });
 
   const [team, setTeam] = useState(task?.team || []);
   const [stage, setStage] = useState(task?.stage?.toUpperCase() || LISTS[0]);
-  const [priority, setPriority] = useState(
-    task?.priority?.toUpperCase() || PRIORIRY[2]
-  );
 
   const [createTask, { isLoading }] = useCreateTaskMutation();
   const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
@@ -40,15 +39,17 @@ const AddTask = ({ open, setOpen, task }) => {
     try {
       const newData = {
         ...data,
+        deadline: new Date(data.deadline),
         team,
         stage,
-        priority,
       };
+
       const res = task?._id
         ? await updateTask({ ...newData, _id: task._id }).unwrap()
         : await createTask(newData).unwrap();
 
-        toast.success(task?._id ? "Task updated successfully!" : "Task created successfully!");
+      toast.success(task?._id ? "Task updated successfully!" : "Task created successfully!");
+
       setTimeout(() => {
         setOpen(false);
       }, 500);
@@ -90,27 +91,16 @@ const AddTask = ({ open, setOpen, task }) => {
                 setSelected={setStage}
               />
 
-              <div className='w-full'>
-                <Textbox
-                  placeholder='Date'
-                  type='date'
-                  name='date'
-                  label='Task Date'
-                  className='w-full rounded'
-                  register={register("date", {
-                    required: "Date is required!",
-                  })}
-                  error={errors.date ? errors.date.message : ""}
-                />
-              </div>
-            </div>
-
-            <div className='flex gap-4'>
-              <SelectList
-                label='Priority Level'
-                lists={PRIORIRY}
-                selected={priority}
-                setSelected={setPriority}
+              <Textbox
+                placeholder='Deadline'
+                type='date'
+                name='deadline'
+                label='Deadline'
+                className='w-full rounded'
+                register={register("deadline", {
+                  required: "Deadline is required!",
+                })}
+                error={errors.deadline ? errors.deadline.message : ""}
               />
             </div>
 
