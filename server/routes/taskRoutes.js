@@ -10,8 +10,11 @@ import {
   postTaskActivity,
   trashTask,
   updateTask,
+  uploadTaskDocument,
 } from "../controllers/taskController.js";
 import { isAdminRoute, protectRoute } from "../middlewares/authMiddleware.js";
+import upload from '../utils/multer.js';
+
 
 const router = express.Router();
 
@@ -33,5 +36,7 @@ router.delete(
   isAdminRoute,
   deleteRestoreTask
 );
+
+router.post('/upload/:taskId', upload.single('document'), uploadTaskDocument);
 
 export default router;

@@ -46,6 +46,7 @@ export const TASK_TYPE = {
   todo: "bg-blue-600",
   "in progress": "bg-yellow-600",
   completed: "bg-green-600",
+  overdue: "bg-red-600",
 };
 
 export const BGS = [

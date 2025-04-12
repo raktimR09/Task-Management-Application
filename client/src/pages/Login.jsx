@@ -1,113 +1,165 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-// import { login } from '../redux/slices/authSlice'; // Ensure correct path
-import Textbox from "../components/Textbox";
-import Button from "../components/Button";
-import { useLoginMutation } from '../redux/slices/api/authApiSlice';
-import Loading from '../components/Loader';
+import { useLoginMutation, useForgotPasswordMutation } from '../redux/slices/api/authApiSlice';
 import { setCredentials } from '../redux/slices/authSlice';
 import { toast } from 'sonner';
+import Loading from '../components/Loader';
 
 const Login = () => {
-    const { register, handleSubmit, formState: { errors } } = useForm();
-    const navigate = useNavigate();
+  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register: resetRegister, handleSubmit: handleResetSubmit, formState: { errors: resetErrors } } = useForm();
 
-    const [login,{isLoading}]=useLoginMutation();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { user } = useSelector(state => state.auth);
 
-    const dispatch = useDispatch();
-    const { user } = useSelector(state => state.auth); // Get user from Redux
+  const [login, { isLoading }] = useLoginMutation();
+  const [forgotPassword, { isLoading: isResetting }] = useForgotPasswordMutation();
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
-    // Redirect to dashboard if already logged in
-    useEffect(() => {
-        user &&
-            navigate("/dashboard");
-    }, [user]);
+  useEffect(() => {
+    if (user) navigate('/dashboard');
+  }, [user]);
 
-    const submitHandler = async (data) => {
-        console.log("Submitting data:", data); // Debugging
-        try {
-            const result = await login(data).unwrap();
-            dispatch(setCredentials(result));
-            navigate("/");
-            console.log("Login successful:", result);
-            toast.success("Login Successful");
-        } catch (error) {
-            console.log("Login error:", error);
-            toast.error("Invalid email or password. Try again!");
-        }
-    };
-    
+  const onSubmit = async (data) => {
+    try {
+      const res = await login(data).unwrap();
+      dispatch(setCredentials(res));
+      toast.success("Login successful!");
+      navigate('/');
+    } catch (error) {
+      toast.error("Invalid credentials.");
+    }
+  };
 
-    return (    
-        <div className='w-full min-h-screen flex items-center justify-center flex-col lg:flex-row bg-[#f3f4f6]'>
-            <div className='w-full md:w-auto flex gap-0 md:gap-40 flex-col md:flex-row items-center justify-center'>
-                {/* Left Side */}
-                <div className='h-full w-full lg:w-2/3 flex flex-col items-center justify-center'>
-                    <div className='w-full md:max-w-lg 2xl:max-w-3xl flex flex-col items-center justify-center gap-5 md:gap-y-10 2xl:-mt-20'>
-                        <span className='flex gap-1 py-1 px-3 border rounded-full text-sm md:text-base border-gray-300 text-gray-600'>
-                            Manage all your tasks in one place!
-                        </span>
-                        <p className='flex flex-col gap-0 md:gap-4 text-4xl md:text-6xl 2xl:text-7xl font-black text-center text-blue-700'>
-                            <span>Task Management</span>
-                            <span>Application</span>
-                        </p>
-                        <div className='cell'>
-              <div className='circle rotate-in-up-left'></div>
+  const handleForgotPassword = async (data) => {
+    try {
+      await forgotPassword(data).unwrap();
+      toast.success("Reset link sent!");
+      setShowForgotModal(false);
+    } catch (error) {
+      toast.error("Failed to send reset link.");
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-[#B9B7F2] px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl flex flex-col md:flex-row overflow-hidden">
+
+        {/* Left Side: Form */}
+        <div className="w-full md:w-1/2 p-10 flex flex-col justify-center">
+          <h1 className="text-3xl font-bold mb-1 text-[#111827]">Welcome Back!</h1>
+          <p className="text-gray-600 mb-8">Please enter login details below</p>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium">Email</label>
+              <input
+                type="email"
+                placeholder="Enter the email"
+                className="mt-1 block w-full rounded-md border px-4 py-2 outline-none"
+                {...register("email", { required: "Email is required" })}
+              />
+              {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
             </div>
+
+            <div>
+              <label className="block text-sm font-medium">Password</label>
+              <input
+                type="password"
+                placeholder="Enter the Password"
+                className="mt-1 block w-full rounded-md border px-4 py-2 outline-none"
+                {...register("password", { required: "Password is required" })}
+              />
+              {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
+            </div>
+
+            <div className="text-right">
+              <button
+                type="button"
+                className="text-sm text-blue-600 hover:underline"
+                onClick={() => setShowForgotModal(true)}
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {isLoading ? (
+              <Loading />
+            ) : (
+              <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">
+                Sign in
+              </button>
+            )}
+
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span className="flex-grow border-t" />
+              or continue
+              <span className="flex-grow border-t" />
+            </div>
+
+            <button className="w-full border py-2 flex justify-center items-center gap-2 rounded-md">
+              <img src="https://img.icons8.com/color/16/000000/google-logo.png" alt="Google logo" />
+              Log in with Google
+            </button>
+
+            <p className="text-center text-sm">
+              Don’t have an account?{" "}
+              <a href="/register" className="text-blue-600 hover:underline">Sign Up</a>
+            </p>
+          </form>
+        </div>
+
+        {/* Right Side: Illustration */}
+        <div className="w-full md:w-1/2 bg-[#C6C5F9] flex items-center justify-center p-6">
+          <div className="text-center">
+            <img
+              src="/Task-Illustration.webp"
+              alt="Illustration"
+              className="mx-auto w-95% h-80%"
+            />
+            <p className="text-gray-800 font-serif text-xl">
+              Manage your task in an easy and more efficient way!!!
+            </p>
           </div>
         </div>
+      </div>
 
-                {/* Right Side */}
-                <div className='w-full md:w-1/3 p-4 md:p-1 flex flex-col justify-center items-center'>
-                    <form onSubmit={handleSubmit(submitHandler)}
-                        className='form-container w-full md:w-[400px] flex flex-col gap-y-8 bg-white px-10 pt-14 pb-14'>
-                        <div>
-                            <p className='text-blue-600 text-3xl font-bold text-center'>Welcome Back!</p>
-                            <p className='text-center text-base text-gray-700'>Keep all your credentials safe.</p>
-                        </div>
-                        <div className='flex flex-col gap-y-5'>
-                            <Textbox
-                                placeholder='email@example.com'
-                                type='email'
-                                name='email'
-                                label='Email Address'
-                                className='w-full rounded-full'
-                                register={register("email", {
-                                  required: "Email Address is required!",
-                                })}
-                                error={errors.email ? errors.email.message : ""}
-                            />
-                            <Textbox
-                                placeholder='Enter your password here...'
-                                type='password'
-                                name='password'
-                                label='Password'
-                                className='w-full rounded-full'
-                                register={register("password", {
-                                  required: "Password is required!",
-                                })}
-                                error={errors.password ? errors.password.message : ""}
-                            />
-                            <span className='text-sm text-gray-500 hover:text-blue-600 hover:underline cursor-pointer'>
-                Forgot Password?
-              </span>
-                            {isLoading?(
-                                <Loading/>
-                            ):(
-                                <Button
-                                    type='submit'
-                                    label='Submit'
-                                    className='w-full h-10 bg-blue-700 text-white rounded-full'
-                                />
-                            )}
-                        </div>
-                    </form>
-                </div>
-            </div>
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-md w-[90%] max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Reset Password</h2>
+            <form onSubmit={handleResetSubmit(handleForgotPassword)} className="space-y-4">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                className="border w-full px-4 py-2 rounded-md"
+                {...resetRegister("email", { required: "Email is required" })}
+              />
+              {resetErrors.email && <p className="text-red-500 text-sm">{resetErrors.email.message}</p>}
+
+              {isResetting ? (
+                <Loading />
+              ) : (
+                <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-md">
+                  Send Reset Link
+                </button>
+              )}
+            </form>
+            <button
+              className="mt-4 text-sm text-gray-600 hover:underline"
+              onClick={() => setShowForgotModal(false)}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default Login;

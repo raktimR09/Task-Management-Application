@@ -9,6 +9,7 @@ import Button from "../Button";
 import {
   useCreateTaskMutation,
   useUpdateTaskMutation,
+  useUploadTaskDocumentsMutation,
 } from "../../redux/slices/api/taskApiSlice";
 import { toast } from "sonner";
 import { dateFormatter } from "../../utils";
@@ -31,9 +32,15 @@ const AddTask = ({ open, setOpen, task }) => {
 
   const [team, setTeam] = useState(task?.team || []);
   const [stage, setStage] = useState(task?.stage?.toUpperCase() || LISTS[0]);
+  const [documents, setDocuments] = useState([]);
 
   const [createTask, { isLoading }] = useCreateTaskMutation();
   const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
+  const [uploadTaskDocuments] = useUploadTaskDocumentsMutation();
+
+  const handleFileChange = (e) => {
+    setDocuments([...e.target.files]);
+  };
 
   const submitHandler = async (data) => {
     try {
@@ -48,80 +55,97 @@ const AddTask = ({ open, setOpen, task }) => {
         ? await updateTask({ ...newData, _id: task._id }).unwrap()
         : await createTask(newData).unwrap();
 
-      toast.success(task?._id ? "Task updated successfully!" : "Task created successfully!");
+      const taskId = task?._id || res._id;
 
-      setTimeout(() => {
-        setOpen(false);
-      }, 500);
+      if (documents.length > 0) {
+        const formData = new FormData();
+        documents.forEach((doc) => formData.append("documents", doc));
+
+        await uploadTaskDocuments({ taskId, formData });
+      }
+
+      toast.success(task?._id ? "Task updated successfully!" : "Task created successfully!");
+      setTimeout(() => setOpen(false), 500);
     } catch (error) {
-      console.log(error);
+      console.error(error);
       toast.error("Something went wrong!");
     }
   };
 
   return (
-    <>
-      <ModalWrapper open={open} setOpen={setOpen}>
-        <form onSubmit={handleSubmit(submitHandler)}>
-          <Dialog.Title
-            as='h2'
-            className='text-base font-bold leading-6 text-gray-900 mb-4'
-          >
-            {task ? "UPDATE TASK" : "ADD TASK"}
-          </Dialog.Title>
+    <ModalWrapper open={open} setOpen={setOpen}>
+      <form onSubmit={handleSubmit(submitHandler)}>
+        <Dialog.Title
+          as="h2"
+          className="text-base font-bold leading-6 text-gray-900 mb-4"
+        >
+          {task ? "UPDATE TASK" : "ADD TASK"}
+        </Dialog.Title>
 
-          <div className='mt-2 flex flex-col gap-6'>
-            <Textbox
-              placeholder='Task Title'
-              type='text'
-              name='title'
-              label='Task Title'
-              className='w-full rounded'
-              register={register("title", { required: "Title is required" })}
-              error={errors.title ? errors.title.message : ""}
+        <div className="mt-2 flex flex-col gap-6">
+          <Textbox
+            placeholder="Task Title"
+            type="text"
+            name="title"
+            label="Task Title"
+            className="w-full rounded"
+            register={register("title", { required: "Title is required" })}
+            error={errors.title ? errors.title.message : ""}
+          />
+
+          <UserList setTeam={setTeam} team={team} />
+
+          <div className="flex gap-4">
+            <SelectList
+              label="Task Stage"
+              lists={LISTS}
+              selected={stage}
+              setSelected={setStage}
             />
 
-            <UserList setTeam={setTeam} team={team} />
-
-            <div className='flex gap-4'>
-              <SelectList
-                label='Task Stage'
-                lists={LISTS}
-                selected={stage}
-                setSelected={setStage}
-              />
-
-              <Textbox
-                placeholder='Deadline'
-                type='date'
-                name='deadline'
-                label='Deadline'
-                className='w-full rounded'
-                register={register("deadline", {
-                  required: "Deadline is required!",
-                })}
-                error={errors.deadline ? errors.deadline.message : ""}
-              />
-            </div>
-
-            <div className='bg-gray-50 py-6 sm:flex sm:flex-row-reverse gap-4'>
-              <Button
-                label='Submit'
-                type='submit'
-                className='bg-blue-600 px-8 text-sm font-semibold text-white hover:bg-blue-700  sm:w-auto'
-              />
-
-              <Button
-                type='button'
-                className='bg-white px-5 text-sm font-semibold text-gray-900 sm:w-auto'
-                onClick={() => setOpen(false)}
-                label='Cancel'
-              />
-            </div>
+            <Textbox
+              placeholder="Deadline"
+              type="date"
+              name="deadline"
+              label="Deadline"
+              className="w-full rounded"
+              register={register("deadline", {
+                required: "Deadline is required!",
+              })}
+              error={errors.deadline ? errors.deadline.message : ""}
+            />
           </div>
-        </form>
-      </ModalWrapper>
-    </>
+
+          {/* File Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Attach Documents
+            </label>
+            <input
+              type="file"
+              multiple
+              onChange={handleFileChange}
+              className="mt-2 w-full text-sm"
+            />
+          </div>
+
+          <div className="bg-gray-50 py-6 sm:flex sm:flex-row-reverse gap-4">
+            <Button
+              label="Submit"
+              type="submit"
+              className="bg-blue-600 px-8 text-sm font-semibold text-white hover:bg-blue-700 sm:w-auto"
+            />
+
+            <Button
+              type="button"
+              className="bg-white px-5 text-sm font-semibold text-gray-900 sm:w-auto"
+              onClick={() => setOpen(false)}
+              label="Cancel"
+            />
+          </div>
+        </div>
+      </form>
+    </ModalWrapper>
   );
 };
 

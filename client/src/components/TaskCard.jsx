@@ -44,20 +44,17 @@ const TaskCard = ({ task }) => {
           {user?.isAdmin && <TaskDialog task={task} />}
         </div>
 
-        <>
-          <div className="flex items-center gap-2 mt-2">
-            <div
-              className={clsx("w-4 h-4 rounded-full", TASK_TYPE[task.stage])}
-            />
-            <h4 className="line-clamp-1 text-black">{task?.title}</h4>
-          </div>
+        <div className="flex items-center gap-2 mt-2">
+          <div
+            className={clsx("w-4 h-4 rounded-full", TASK_TYPE[task.stage])}
+          />
+          <h4 className="line-clamp-1 text-black">{task?.title}</h4>
+        </div>
 
-          {/* Dates */}
-          <div className="text-sm text-gray-600 space-y-1 mt-1">
-            <div>📅 Created: {formatDate(new Date(task?.createdAt))}</div>
-            <div>⏰ Deadline: {formatDate(new Date(task?.deadline))}</div>
-          </div>
-        </>
+        <div className="text-sm text-gray-600 space-y-1 mt-1">
+          <div>📅 Created: {formatDate(new Date(task?.createdAt))}</div>
+          <div>⏰ Deadline: {formatDate(new Date(task?.deadline))}</div>
+        </div>
 
         <div className="w-full border-t border-gray-200 my-2" />
         <div className="flex items-center justify-between mb-2">
@@ -92,29 +89,39 @@ const TaskCard = ({ task }) => {
         </div>
 
         {/* Subtasks */}
-        {task?.subTasks?.length > 0 ? (
-          <div className="py-4 border-t border-gray-200">
-            {task.subTasks.map((sub, index) => (
+        <div className="py-4 border-t border-gray-200">
+          {task?.subTasksWithPriority?.length > 0 ? (
+            task.subTasksWithPriority.map((sub, index) => (
               <div key={index} className="mb-2">
-                <h5 className="text-base line-clamp-1 text-black">
-                  {sub.title}
-                </h5>
-                <div className="pl-2 space-x-4">
-                  <span className="text-sm text-gray-600">
-                    {formatDate(new Date(sub.date))}
-                  </span>
-                  <span className="bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium">
-                    {sub.tag}
-                  </span>
+                <h5 className="text-base font-semibold text-black">{sub.title}</h5>
+                <div className="pl-2 text-sm text-gray-700 space-y-1">
+                  <div>⏰ {formatDate(new Date(sub.deadline))}</div>
+                  <div>🔥 Priority: <span className="capitalize">{sub.priority}</span></div>
+                  <div>
+                    <span className="bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium inline-block">
+                      {sub.tag}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {sub.members?.map((m, i) => (
+                      <div
+                        key={i}
+                        className={clsx(
+                          "w-6 h-6 rounded-full text-white flex items-center justify-center text-xs",
+                          BGS[i % BGS.length]
+                        )}
+                      >
+                        <UserInfo user={m} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-4 border-t border-gray-200">
+            ))
+          ) : (
             <span className="text-gray-500">No Sub Task</span>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="w-full pb-2">
           <button
@@ -128,7 +135,7 @@ const TaskCard = ({ task }) => {
         </div>
       </div>
 
-      <AddSubTask open={open} setOpen={setOpen} id={task._id} />
+      <AddSubTask open={open} setOpen={setOpen} id={task._id} team={task.team} />
     </>
   );
 };

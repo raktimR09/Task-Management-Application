@@ -1,5 +1,22 @@
 import mongoose, { Schema } from "mongoose";
 
+const subTaskSchema = new Schema(
+  {
+    title: { type: String, required: true },
+    tag: String,
+    date: {
+      type: Date,
+      default: Date.now, // Subtask creation date
+    },
+    deadline: {
+      type: Date,
+      default: Date.now, // Defaults to creation if not provided
+    },
+    members: [{ type: Schema.Types.ObjectId, ref: "User" }],
+  },
+  { _id: false }
+);
+
 const taskSchema = new Schema(
   {
     title: { type: String, required: true },
@@ -8,7 +25,7 @@ const taskSchema = new Schema(
     stage: {
       type: String,
       default: "todo",
-      enum: ["todo", "in progress", "completed"],
+      enum: ["todo", "in progress", "completed", "overdue"],
     },
     activities: [
       {
@@ -28,21 +45,29 @@ const taskSchema = new Schema(
         by: { type: Schema.Types.ObjectId, ref: "User" },
       },
     ],
-    subTasks: [
+    subTasks: [subTaskSchema],
+    assets: [String],
+    documents: [
       {
-        title: String,
-        date: Date,
-        tag: String,
+        name: String,
+        path: String,
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
-    assets: [String],
     team: [{ type: Schema.Types.ObjectId, ref: "User" }],
     isTrashed: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
-// ✅ Dynamic priority based on deadline
+// ✅ Dynamic priority calculation for parent task
 taskSchema.virtual("priority").get(function () {
   if (!this.deadline) return "normal";
 
@@ -51,8 +76,8 @@ taskSchema.virtual("priority").get(function () {
   const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24));
 
   if (diffInDays <= 2) return "high";
-  if (diffInDays >= 3 && diffInDays <= 7) return "medium";
-  if (diffInDays >= 8 && diffInDays <= 15) return "normal";
+  if (diffInDays <= 7) return "medium";
+  if (diffInDays <= 15) return "normal";
   return "low";
 });
 
@@ -65,10 +90,22 @@ taskSchema.virtual("effectiveStage").get(function () {
   return this.stage;
 });
 
-// Include virtuals in output
-taskSchema.set("toJSON", { virtuals: true });
-taskSchema.set("toObject", { virtuals: true });
+// ✅ Compute subtask priority dynamically
+taskSchema.virtual("subTasksWithPriority").get(function () {
+  return this.subTasks.map((sub) => {
+    const now = new Date();
+    const deadline = sub.deadline || sub.date || now;
+    const diffInMs = deadline - now;
+    const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24));
+
+    let priority = "low";
+    if (diffInDays <= 2) priority = "high";
+    else if (diffInDays <= 7) priority = "medium";
+    else if (diffInDays <= 15) priority = "normal";
+
+    return { ...sub.toObject(), priority };
+  });
+});
 
 const Task = mongoose.model("Task", taskSchema);
-
 export default Task;

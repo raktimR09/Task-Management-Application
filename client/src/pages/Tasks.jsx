@@ -9,7 +9,6 @@ import { IoMdAdd } from "react-icons/io";
 import Tabs from "../components/Tabs";
 import TaskTitle from "../components/TaskTitle";
 import BoardView from "../components/BoardView";
-import { tasks } from "../assets/data";
 import Table from "../components/task/Table";
 import AddTask from "../components/task/AddTask";
 import { useGetAlltaskQuery } from "../redux/slices/api/taskApiSlice";
@@ -23,23 +22,38 @@ const TASK_TYPE = {
   todo: "bg-blue-600",
   "in progress": "bg-yellow-600",
   completed: "bg-green-600",
+  overdue: "bg-red-600",
 };
 
 const Tasks = () => {
   const params = useParams();
-
   const [selected, setSelected] = useState(0);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  
   const status = params?.status || "";
 
-  const{data,isLoading}=useGetAlltaskQuery({
-    strQuery:status,
-    isTrashed:"",
-    search:"",
-  })
-  
+  const { data, isLoading } = useGetAlltaskQuery({
+    strQuery: status,
+    isTrashed: "",
+    search: "",
+  });
+
+  // Add overdue status on the frontend if not set by backend
+  const categorizeTasks = (tasks) => {
+    const now = new Date();
+    return tasks?.map((task) => {
+      const isOverdue =
+        task.stage !== "completed" &&
+        task.dueDate &&
+        new Date(task.dueDate) < now;
+
+      return {
+        ...task,
+        stage: isOverdue ? "overdue" : task.stage,
+      };
+    });
+  };
+
+  const updatedTasks = categorizeTasks(data?.tasks);
 
   return isLoading ? (
     <div className='py-10'>
@@ -48,8 +62,7 @@ const Tasks = () => {
   ) : (
     <div className='w-full'>
       <div className='flex items-center justify-between mb-4'>
-      <Title title={status ? `${status} Tasks` : "Tasks"} />
-
+        <Title title={status ? `${status} Tasks` : "Tasks"} />
 
         {!status && (
           <Button
@@ -65,19 +78,17 @@ const Tasks = () => {
         {!status && (
           <div className='w-full flex justify-between gap-4 md:gap-x-12 py-4'>
             <TaskTitle label='To Do' className={TASK_TYPE.todo} />
-            <TaskTitle
-              label='In Progress'
-              className={TASK_TYPE["in progress"]}
-            />
-            <TaskTitle label='completed' className={TASK_TYPE.completed} />
+            <TaskTitle label='In Progress' className={TASK_TYPE["in progress"]} />
+            <TaskTitle label='Completed' className={TASK_TYPE.completed} />
+            <TaskTitle label='Overdue' className={TASK_TYPE.overdue} />
           </div>
         )}
 
         {selected !== 1 ? (
-          <BoardView tasks={data?.tasks} />
+          <BoardView tasks={updatedTasks} />
         ) : (
           <div className='w-full'>
-            <Table tasks={data?.tasks} />
+            <Table tasks={updatedTasks} />
           </div>
         )}
       </Tabs>

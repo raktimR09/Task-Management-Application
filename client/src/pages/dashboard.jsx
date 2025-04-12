@@ -30,7 +30,7 @@ const TaskTable = ({ tasks }) => {
         <th className='py-2'>Task Title</th>
         <th className='py-2'>Priority</th>
         <th className='py-2'>Team</th>
-        <th className='py-2 hidden md:block'>Created At</th>
+        <th className='py-2'>Deadline</th>
       </tr>
     </thead>
   );
@@ -39,14 +39,10 @@ const TaskTable = ({ tasks }) => {
     <tr className='border-b border-gray-300 text-gray-600 hover:bg-gray-300/10'>
       <td className='py-2'>
         <div className='flex items-center gap-2'>
-          <div
-            className={clsx("w-4 h-4 rounded-full", TASK_TYPE[task.stage])}
-          />
-
+          <div className={clsx("w-4 h-4 rounded-full", TASK_TYPE[task.stage])} />
           <p className='text-base text-black'>{task.title}</p>
         </div>
       </td>
-
       <td className='py-2'>
         <div className='flex gap-1 items-center'>
           <span className={clsx("text-lg", PRIOTITYSTYELS[task.priority])}>
@@ -55,7 +51,6 @@ const TaskTable = ({ tasks }) => {
           <span className='capitalize'>{task.priority}</span>
         </div>
       </td>
-
       <td className='py-2'>
         <div className='flex'>
           {task.team.map((m, index) => (
@@ -71,66 +66,57 @@ const TaskTable = ({ tasks }) => {
           ))}
         </div>
       </td>
-      <td className='py-2 hidden md:block'>
+      <td className='py-2'>
         <span className='text-base text-gray-600'>
-          {moment(task?.date).fromNow()}
+          {moment(task?.deadline).format("MMM D, YYYY")}
         </span>
       </td>
     </tr>
   );
+
   return (
-    <>
-      <div className='w-full md:w-2/3 bg-white px-2 md:px-4 pt-4 pb-4 shadow-md rounded'>
-        <table className='w-full'>
-          <TableHeader />
-          <tbody>
-            {tasks?.map((task, id) => (
-              <TableRow key={id} task={task} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+    <div className='w-full md:w-2/3 bg-white px-2 md:px-4 pt-4 pb-4 shadow-md rounded'>
+      <table className='w-full'>
+        <TableHeader />
+        <tbody>
+          {tasks?.map((task, id) => (
+            <TableRow key={id} task={task} />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };
 
 const UserTable = ({ users }) => {
   const TableHeader = () => (
     <thead className='border-b border-gray-300 '>
-      <tr className='text-black  text-left'>
+      <tr className='text-black text-left'>
         <th className='py-2'>Full Name</th>
-        <th className='py-2'>Status</th>
+        <th className='py-2'>Role</th>
         <th className='py-2'>Created At</th>
       </tr>
     </thead>
   );
 
   const TableRow = ({ user }) => (
-    <tr className='border-b border-gray-200  text-gray-600 hover:bg-gray-400/10'>
+    <tr className='border-b border-gray-200 text-gray-800 hover:bg-gray-400/10'>
       <td className='py-2'>
         <div className='flex items-center gap-3'>
           <div className='w-9 h-9 rounded-full text-white flex items-center justify-center text-sm bg-violet-700'>
             <span className='text-center'>{getInitials(user?.name)}</span>
           </div>
-
           <div>
-            <p> {user.name}</p>
-            <span className='text-xs text-black'>{user?.role}</span>
+            <p>{user.name}</p>
           </div>
         </div>
       </td>
-
-      <td>
-        <p
-          className={clsx(
-            "w-fit px-3 py-1 rounded-full text-sm",
-            user?.isActive ? "bg-blue-200" : "bg-yellow-100"
-          )}
-        >
-          {user?.isActive ? "Active" : "Disabled"}
-        </p>
+      <td className='py-2 px-2'>
+        <p className='text-sm'>{user?.role}</p>
       </td>
-      <td className='py-2 text-sm'>{moment(user?.createdAt).fromNow()}</td>
+      <td className='py-2 px-3'>
+        <p className='text-sm'>{moment(user?.createdAt).format("MMM D, YYYY")}</p>
+      </td>
     </tr>
   );
 
@@ -147,17 +133,18 @@ const UserTable = ({ users }) => {
     </div>
   );
 };
-const Dashboard = () => {
-  
-  const{data,isLoading}=useGetDashboardStatsQuery();
-  if(isLoading)
-    return(
-  <div className='py-10'>
-    <Loading/>
-  </div>
-  );
 
-  const totals=data?.tasks;
+const Dashboard = () => {
+  const { data, isLoading } = useGetDashboardStatsQuery();
+
+  if (isLoading)
+    return (
+      <div className='py-10'>
+        <Loading />
+      </div>
+    );
+
+  const totals = data?.tasks;
 
   const stats = [
     {
@@ -191,12 +178,11 @@ const Dashboard = () => {
     {
       _id: "5",
       label: "OVERDUE TASKS",
-      total: totals["overdue"] || 0,
+      total: totals["overdue"] || totals["Overdue"] || 0,
       icon: <MdKeyboardArrowDown />,
       bg: "bg-[#dc2626]",
     },
   ];
-
 
   const Card = ({ label, count, bg, icon }) => {
     return (
@@ -206,7 +192,6 @@ const Dashboard = () => {
           <span className='text-2xl font-semibold'>{count}</span>
           <span className='text-sm text-gray-400'>{"110 last month"}</span>
         </div>
-
         <div
           className={clsx(
             "w-10 h-10 rounded-full flex items-center justify-center text-white",
@@ -218,14 +203,14 @@ const Dashboard = () => {
       </div>
     );
   };
+
   return (
     <div className='h-full py-4'>
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4'>
-  {stats.map(({ icon, bg, label, total }, index) => (
-    <Card key={index} icon={icon} bg={bg} label={label} count={total} />
-  ))}
-</div>
-
+        {stats.map(({ icon, bg, label, total }, index) => (
+          <Card key={index} icon={icon} bg={bg} label={label} count={total} />
+        ))}
+      </div>
 
       <div className='w-full bg-white my-16 p-4 rounded shadow-sm'>
         <h4 className='text-xl text-gray-600 font-semibold'>
@@ -235,12 +220,7 @@ const Dashboard = () => {
       </div>
 
       <div className='w-full flex flex-col md:flex-row gap-4 2xl:gap-10 py-8'>
-        {/* /left */}
-
         <TaskTable tasks={data?.last10Task} />
-
-        {/* /right */}
-
         <UserTable users={data?.users} />
       </div>
     </div>

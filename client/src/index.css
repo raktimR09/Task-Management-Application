@@ -126,3 +126,53 @@
       box-shadow: 0 0 0 0 rgba(178, 212, 252, 0.7);
     }
   }
+ 
+  /* Smooth theme transition */
+  
+  
+  /* Default light mode styles */
+  body {
+    @apply bg-white text-gray-900;
+  }
+  
+  /* Global dark mode styles (enabled when .dark class is on <html>) */
+  .dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
+  
+  /* Optional utility: make inputs, buttons, etc., adapt to dark mode */
+  input,
+  textarea,
+  select {
+    @apply bg-white text-gray-900 border border-gray-300;
+  }
+  
+  .dark input,
+  .dark textarea,
+  .dark select {
+    @apply bg-gray-800 text-gray-100 border-gray-700;
+  }
+  
+  /* Buttons (if you're using unstyled ones anywhere) */
+  button {
+    @apply transition duration-200;
+  }
+  
+  /* Optional scrollbar style for dark mode */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .dark ::-webkit-scrollbar-track {
+    background: #1f2937; /* Tailwind's gray-800 */
+  }
+  
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: #4b5563; /* Tailwind's gray-600 */
+    border-radius: 4px;
+  }
+
+  html {
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  

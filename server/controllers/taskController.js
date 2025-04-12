@@ -12,11 +12,19 @@ export const createTask = async (req, res) => {
 
     const createdAt = new Date();
     const deadlineDate = new Date(deadline);
+    const now = new Date();
+
+    let finalStage = stage.toLowerCase();
+
+    // Prevent invalid status for overdue tasks
+    if (deadlineDate < now && finalStage !== "completed") {
+      finalStage = "overdue";
+    }
 
     const task = await Task.create({
       title,
       team,
-      stage: stage.toLowerCase(),
+      stage: finalStage,
       deadline: deadlineDate,
       createdAt,
       assets,
@@ -29,9 +37,6 @@ export const createTask = async (req, res) => {
     return res.status(500).json({ status: false, message: error.message });
   }
 };
-
-
-
 
 export const duplicateTask = async (req, res) => {
   try {
@@ -185,19 +190,27 @@ export const getTasks = async (req, res) => {
     const { stage, isTrashed } = req.query;
 
     let query = { isTrashed: isTrashed ? true : false };
+    if (stage) query.stage = stage;
 
-    if (stage) {
-      query.stage = stage;
-    }
-
-    let queryResult = Task.find(query)
+    let tasks = await Task.find(query)
       .populate({
         path: "team",
         select: "name title email",
       })
+      .populate({
+        path: "subTasks.members",
+        select: "name fullName email",
+      })
       .sort({ _id: -1 });
 
-    const tasks = await queryResult;
+    // Automatically mark overdue tasks
+    const now = new Date();
+    tasks = tasks.map(task => {
+      if (task.deadline < now && task.stage !== "completed") {
+        task.stage = "overdue"; // Update the stage in memory
+      }
+      return task;
+    });
 
     res.status(200).json({
       status: true,
@@ -221,6 +234,10 @@ export const getTask = async (req, res) => {
       .populate({
         path: "activities.by",
         select: "name",
+      })
+      .populate({
+        path: "subTasks.members",
+        select: "name fullName email",
       });
 
     res.status(200).json({
@@ -233,32 +250,46 @@ export const getTask = async (req, res) => {
   }
 };
 
+
 export const createSubTask = async (req, res) => {
   try {
-    const { title, tag, date } = req.body;
-
+    const { title, tag, deadline, members, priority } = req.body;
     const { id } = req.params;
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found." });
+    }
+
+    // Ensure valid members only (i.e., exist in parent task's team)
+    const validMembers = (members || []).filter(member =>
+      task.team.includes(member)
+    );
 
     const newSubTask = {
       title,
-      date,
       tag,
+      deadline: new Date(deadline),
+      members: validMembers,
+      priority: priority?.toLowerCase() ?? "low",
     };
 
-    const task = await Task.findById(id);
-
     task.subTasks.push(newSubTask);
-
     await task.save();
 
-    res
-      .status(200)
-      .json({ status: true, message: "SubTask added successfully." });
+    res.status(200).json({ status: true, message: "SubTask added successfully." });
   } catch (error) {
     console.log(error);
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
+
+
+
+// controllers/taskController.js
+
+
 
 export const updateTask = async (req, res) => {
   try {
@@ -271,10 +302,20 @@ export const updateTask = async (req, res) => {
     }
 
     if (title) task.title = title;
-    if (date) task.deadline = new Date(date); // Ensure deadline updates correctly
-    if (stage) task.stage = stage.toLowerCase();
-    if (assets) task.assets = assets;
+    if (date) task.deadline = new Date(date);
     if (team) task.team = team;
+    if (assets) task.assets = assets;
+
+    // Handle overdue logic
+    const now = new Date();
+    const newDeadline = date ? new Date(date) : task.deadline;
+    let finalStage = stage ? stage.toLowerCase() : task.stage;
+
+    if (finalStage !== "completed" && newDeadline < now) {
+      finalStage = "overdue";
+    }
+
+    task.stage = finalStage;
 
     await task.save();
 
@@ -284,6 +325,7 @@ export const updateTask = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
 
 
 
@@ -337,3 +379,28 @@ export const deleteRestoreTask = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
+export const uploadTaskDocument = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const files = req.files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No files uploaded" });
+    }
+
+    const filePaths = files.map((file) => file.filename); // Only store filename or full path if needed
+
+    const task = await Task.findById(taskId);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    task.assets = [...task.assets, ...filePaths];
+    await task.save();
+
+    res.status(200).json({ message: "Files uploaded successfully", assets: task.assets });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
