@@ -1,22 +1,26 @@
 import mongoose, { Schema } from "mongoose";
 
+// Subtask Schema
 const subTaskSchema = new Schema(
   {
     title: { type: String, required: true },
     tag: String,
     date: {
       type: Date,
-      default: Date.now, // Subtask creation date
+      default: Date.now,
     },
     deadline: {
       type: Date,
-      default: Date.now, // Defaults to creation if not provided
+      default: Date.now,
     },
     members: [{ type: Schema.Types.ObjectId, ref: "User" }],
   },
-  { _id: false }
+  {
+    _id: true, // ensure each subtask has an ObjectId
+  }
 );
 
+// Task Schema
 const taskSchema = new Schema(
   {
     title: { type: String, required: true },
@@ -62,12 +66,12 @@ const taskSchema = new Schema(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
+    toJSON: { virtuals: true }, // so .toJSON() includes virtuals like isLocked
     toObject: { virtuals: true },
   }
 );
 
-// ✅ Dynamic priority calculation for parent task
+// ✅ Dynamic priority for task based on how close deadline is
 taskSchema.virtual("priority").get(function () {
   if (!this.deadline) return "normal";
 
@@ -81,7 +85,7 @@ taskSchema.virtual("priority").get(function () {
   return "low";
 });
 
-// ✅ Virtual stage with overdue logic
+// ✅ Override stage if overdue (but not completed)
 taskSchema.virtual("effectiveStage").get(function () {
   const now = new Date();
   if (this.stage !== "completed" && this.deadline < now) {
@@ -90,7 +94,13 @@ taskSchema.virtual("effectiveStage").get(function () {
   return this.stage;
 });
 
-// ✅ Compute subtask priority dynamically
+// ✅ Determine if task is locked (overdue and not completed)
+taskSchema.virtual("isLocked").get(function () {
+  const now = new Date();
+  return this.stage !== "completed" && this.deadline < now;
+});
+
+// ✅ Add computed priority to each subtask
 taskSchema.virtual("subTasksWithPriority").get(function () {
   return this.subTasks.map((sub) => {
     const now = new Date();
@@ -107,5 +117,6 @@ taskSchema.virtual("subTasksWithPriority").get(function () {
   });
 });
 
+// Export the Task model
 const Task = mongoose.model("Task", taskSchema);
 export default Task;

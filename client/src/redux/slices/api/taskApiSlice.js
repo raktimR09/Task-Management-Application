@@ -94,6 +94,26 @@ export const taskApiSlice=apiSlice.injectEndpoints({
             }),
           }),
 
+          updateSubTask: builder.mutation({
+            query: ({ id, data }) => ({
+              url: `/task/update-subtask/${id}`, // Corrected API path
+              method: "PUT",
+              body: JSON.stringify(data),
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+            }),
+          }),
+          
+          deleteSubTask: builder.mutation({
+            query: ({ taskId, subtaskId }) => ({
+              url: `/task/delete-subtask/${taskId}/${subtaskId}`,  // API path for deleting subtask
+              method: "DELETE",
+              credentials: "include",
+            }),
+          }),
+          
+          
+
         deleteRestoreTask: builder.mutation({
             query:({id,actionType})=>({
                     url:`/task/delete-restore/${id}?actionType=${actionType}`,
@@ -114,5 +134,7 @@ export const{useGetDashboardStatsQuery,
     useGetSingleTaskQuery,
     usePostTaskActivityMutation,
     useDeleteRestoreTaskMutation,
+    useUpdateSubTaskMutation,
+    useDeleteSubTaskMutation,
     useUploadTaskDocumentsMutation
 }=taskApiSlice

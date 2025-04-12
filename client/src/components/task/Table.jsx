@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { BiMessageAltDetail } from "react-icons/bi";
 import {
-  MdAttachFile,
+  MdDelete,
   MdKeyboardArrowDown,
   MdKeyboardArrowUp,
   MdKeyboardDoubleArrowUp,
@@ -58,7 +58,7 @@ const Table = ({ tasks }) => {
         <th className='py-2'>Task Title</th>
         <th className='py-2'>Priority</th>
         <th className='py-2'>Created At</th>
-        <th className='py-2'>Assets</th>
+        <th className='py-2'>Deadline</th> {/* ✅ Changed from Assets */}
         <th className='py-2'>Team</th>
       </tr>
     </thead>
@@ -83,27 +83,15 @@ const Table = ({ tasks }) => {
       </td>
 
       <td className='py-2'>
-      <span className='text-sm text-gray-600'>
-         {formatDate(task?.createdAt)}
-      </span>
-
+        <span className='text-sm text-gray-600'>
+          {formatDate(task?.createdAt)}
+        </span>
       </td>
 
       <td className='py-2'>
-        <div className='flex items-center gap-3'>
-          <div className='flex gap-1 items-center text-sm text-gray-600'>
-            <BiMessageAltDetail />
-            <span>{task?.activities?.length}</span>
-          </div>
-          <div className='flex gap-1 items-center text-sm text-gray-600'>
-            <MdAttachFile />
-            <span>{task?.assets?.length}</span>
-          </div>
-          <div className='flex gap-1 items-center text-sm text-gray-600'>
-            <FaList />
-            <span>0/{task?.subTasks?.length}</span>
-          </div>
-        </div>
+        <span className='text-sm text-gray-600'>
+          {formatDate(task?.deadline)}
+        </span>
       </td>
 
       <td className='py-2'>

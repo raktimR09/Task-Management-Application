@@ -104,7 +104,7 @@ export const postTaskActivity = async (req, res) => {
 
     res
       .status(200)
-      .json({ status: true, message: "Activity posted successfully." });
+      .json({ status: true, message: " Activity posted successfully." });
   } catch (error) {
     console.log(error);
     return res.status(400).json({ status: false, message: error.message });
@@ -261,7 +261,15 @@ export const createSubTask = async (req, res) => {
       return res.status(404).json({ status: false, message: "Task not found." });
     }
 
-    // Ensure valid members only (i.e., exist in parent task's team)
+    // ❌ Prevent adding subtask if task is locked (overdue)
+    if (task.isLocked) {
+      return res.status(403).json({
+        status: false,
+        message: "Task is locked (overdue) and cannot be modified.",
+      });
+    }
+
+    // ✅ Ensure valid members only (i.e., exist in parent task's team)
     const validMembers = (members || []).filter(member =>
       task.team.includes(member)
     );
@@ -285,10 +293,43 @@ export const createSubTask = async (req, res) => {
 };
 
 
+export const updateSubTask = async (req, res) => {
+  const { id } = req.params;
+  const { title, deadline, priority, tag, members } = req.body;
 
+  try {
+    const task = await Task.findOne({ "subTasks._id": id });
+    if (!task) {
+      return res.status(404).json({ message: "Subtask not found (parent task missing)" });
+    }
 
-// controllers/taskController.js
+    // ❌ Prevent editing if parent task is locked (overdue and not completed)
+    if (task.isLocked) {
+      return res.status(403).json({
+        message: "Task is locked (overdue) and cannot be edited.",
+      });
+    }
 
+    const subtask = task.subTasks.id(id);
+    if (!subtask) {
+      return res.status(404).json({ message: "Subtask not found" });
+    }
+
+    // ✅ Update subtask fields
+    subtask.title = title;
+    subtask.deadline = deadline;
+    subtask.priority = priority;
+    subtask.tag = tag;
+    subtask.members = members;
+
+    await task.save();
+
+    res.json({ message: "Subtask updated successfully", subtask });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 
 export const updateTask = async (req, res) => {
@@ -299,6 +340,14 @@ export const updateTask = async (req, res) => {
     const task = await Task.findById(id);
     if (!task) {
       return res.status(404).json({ status: false, message: "Task not found" });
+    }
+
+    // ❌ Prevent editing if task is locked (overdue)
+    if (task.isLocked) {
+      return res.status(403).json({
+        status: false,
+        message: "Task is locked (overdue) and cannot be edited.",
+      });
     }
 
     if (title) task.title = title;
@@ -325,9 +374,6 @@ export const updateTask = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
-
-
-
 
 export const trashTask = async (req, res) => {
   try {
@@ -403,4 +449,35 @@ export const uploadTaskDocument = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const deleteSubTask = async (req, res) => {
+  try {
+    const { taskId, subtaskId } = req.params;  // Getting the taskId and subtaskId from params
+
+    // Find the task by ID
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found" });
+    }
+
+    // Find the subtask index in the task's subTasks array
+    const subtaskIndex = task.subTasks.findIndex((subtask) => subtask._id.toString() === subtaskId);
+
+    if (subtaskIndex === -1) {
+      return res.status(404).json({ status: false, message: "Subtask not found" });
+    }
+
+    // Remove the subtask from the array
+    task.subTasks.splice(subtaskIndex, 1);
+
+    // Save the updated task
+    await task.save();
+
+    return res.status(200).json({ status: true, message: "Subtask deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting subtask:", error);
+    return res.status(500).json({ status: false, message: "Server error, could not delete subtask" });
+  }
+};
+
 
