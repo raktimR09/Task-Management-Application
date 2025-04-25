@@ -1,22 +1,22 @@
-// utils/multer.js
-import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import multer from "multer";
+import path from "path";
 
-// Enable __dirname in ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
+// Allow all file types
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../uploads')); // Make sure this folder exists
+    cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
   },
 });
 
-const upload = multer({ storage });
+// Allow any file type
+const fileFilter = (req, file, cb) => {
+  cb(null, true); // accept all files
+};
+
+const upload = multer({ storage, fileFilter });
 
 export default upload;

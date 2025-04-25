@@ -61,7 +61,14 @@ const AddTask = ({ open, setOpen, task }) => {
         const formData = new FormData();
         documents.forEach((doc) => formData.append("documents", doc));
 
-        await uploadTaskDocuments({ taskId, formData });
+        try {
+          await uploadTaskDocuments({ taskId, formData }).unwrap();
+          toast.success("Documents uploaded successfully!");
+          console.log("Document Uploaded");
+        } catch (uploadError) {
+          console.error("Document upload failed:", uploadError);
+          toast.error("Failed to upload documents.");
+        }
       }
 
       toast.success(task?._id ? "Task updated successfully!" : "Task created successfully!");

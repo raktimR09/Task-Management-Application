@@ -22,8 +22,8 @@ const app = express();
 // Enable CORS for frontend
 app.use(
   cors({
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST", "DELETE", "PUT"],
+    origin: "http://localhost:3000", // Replace with your frontend URL in production
+    methods: ["GET", "POST", "DELETE", "PUT", "PATCH"],
     credentials: true,
   })
 );
@@ -44,9 +44,17 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // API routes
 app.use("/api", routes);
 
+// Serve React build files (for production)
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "client", "build")));
+  app.get("*", (req, res) =>
+    res.sendFile(path.join(__dirname, "client", "build", "index.html"))
+  );
+}
+
 // Error handling
 app.use(routeNotFound);
 app.use(errorHandler);
 
 // Start the server
-app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));

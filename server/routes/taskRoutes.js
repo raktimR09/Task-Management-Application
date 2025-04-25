@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import {
   createSubTask,
   createTask,
@@ -13,11 +14,18 @@ import {
   uploadTaskDocument,
   updateSubTask,
   deleteSubTask,
+  getTaskDocument,
+  deleteTaskDocument,
 } from "../controllers/taskController.js";
 import { isAdminRoute, protectRoute } from "../middlewares/authMiddleware.js";
 import upload from '../utils/multer.js';
+import { fileURLToPath } from 'url';
+
 
 const router = express.Router();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 router.post("/create", protectRoute, isAdminRoute, createTask);
 router.post("/duplicate/:id", protectRoute, isAdminRoute, duplicateTask);
@@ -43,6 +51,13 @@ router.delete(
   deleteRestoreTask
 );
 
-router.post('/upload/:taskId', upload.single('document'), uploadTaskDocument);
+router.post('/upload/:taskId', upload.array('documents'), uploadTaskDocument);
+
+router.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+router.get('/:taskId/documents/:docName', getTaskDocument);
+
+router.delete('/:taskId/documents/:docId', deleteTaskDocument);
+
+
 
 export default router;

@@ -1,6 +1,11 @@
 import Notice from "../models/notification.js";
 import Task from "../models/task.js";
 import User from "../models/user.js";
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const createTask = async (req, res) => {
   try {
@@ -91,25 +96,37 @@ export const postTaskActivity = async (req, res) => {
     const { type, activity } = req.body;
 
     const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found" });
+    }
 
+    // Prepare activity data with date explicitly set to the current time
     const data = {
       type,
       activity,
       by: userId,
+      date: new Date(),
     };
 
+    // Push the new activity to the task's activities array
     task.activities.push(data);
 
+    // Update task stage if it's currently "todo"
+    if (task.stage === "todo") {
+      task.stage = "in progress";
+    }
+
+    // Save the task with the new activity and possibly updated stage
     await task.save();
 
-    res
-      .status(200)
-      .json({ status: true, message: " Activity posted successfully." });
+    res.status(200).json({ status: true, message: "Activity posted successfully." });
   } catch (error) {
     console.log(error);
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
+
 
 export const dashboardStatistics = async (req, res) => {
   try {
@@ -429,21 +446,36 @@ export const deleteRestoreTask = async (req, res) => {
 export const uploadTaskDocument = async (req, res) => {
   try {
     const { taskId } = req.params;
-    const files = req.files;
+    const files = req.files; // Expect upload.array('documents') on frontend
 
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "No files uploaded" });
     }
 
-    const filePaths = files.map((file) => file.filename); // Only store filename or full path if needed
+    // Prepare an array of document objects to push into the task's documents array
+    const documentsToAdd = files.map((file) => ({
+      name: file.originalname,    // The original file name
+      path: file.path,            // The file path where multer saved it
+      uploadedAt: new Date(),     // Timestamp of when the document was uploaded
+    }));
 
+    // Find the task by its ID
     const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
 
-    task.assets = [...task.assets, ...filePaths];
+    // Push new documents into the task's `documents` array
+    task.documents.push(...documentsToAdd);
+
+    // Save the task with the updated documents array
     await task.save();
 
-    res.status(200).json({ message: "Files uploaded successfully", assets: task.assets });
+    // Return the updated documents array
+    res.status(200).json({
+      message: "Files uploaded successfully",
+      documents: task.documents, // Send the updated documents array back in the response
+    });
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -480,4 +512,48 @@ export const deleteSubTask = async (req, res) => {
   }
 };
 
+export const getTaskDocument = async (req, res) => {
+  try {
+    const { taskId, docName } = req.params;
 
+    // Fetch the task to check if document exists
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    // Find the document by name
+    const doc = task.documents.find(document => document.name === docName);
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    // Path to the document
+    const docPath = path.join(__dirname, `../../uploads/${doc.path}`);
+
+    // Return the document to be previewed
+    res.sendFile(docPath);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const deleteTaskDocument = async (req, res) => {
+  try {
+    const { taskId, docId } = req.params;
+
+    const task = await Task.findById(taskId);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    // Remove the document from the task's documents array
+    task.documents = task.documents.filter(doc => doc._id.toString() !== docId);
+
+    await task.save();
+
+    res.status(200).json({ message: "Document deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

@@ -40,7 +40,9 @@ export const PRIOTITYSTYELS = {
   high: "text-red-600",
   medium: "text-yellow-600",
   low: "text-blue-600",
+  normal: "text-green-600", // Added for normal priority
 };
+
 
 export const TASK_TYPE = {
   todo: "bg-blue-600",

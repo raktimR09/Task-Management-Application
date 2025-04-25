@@ -47,14 +47,16 @@ const taskSchema = new Schema(
         },
         activity: String,
         by: { type: Schema.Types.ObjectId, ref: "User" },
+        date: {
+          type: Date,
+        },
       },
     ],
     subTasks: [subTaskSchema],
-    assets: [String],
     documents: [
       {
-        name: String,
-        path: String,
+        name: { type: String, required: true },
+        path: { type: String, required: true },
         uploadedAt: {
           type: Date,
           default: Date.now,

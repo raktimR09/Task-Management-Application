@@ -146,6 +146,15 @@ const Dashboard = () => {
 
   const totals = data?.tasks;
 
+  // Group tasks by stage (you can use stages like "todo", "in progress", "completed")
+  const groupedByStage = {
+    todo: totals["todo"] || 0,
+    inProgress: totals["in progress"] || 0,
+    completed: totals["completed"] || 0,
+    overdue: totals["overdue"] || totals["Overdue"] || 0,
+  };
+
+  // Prepare stats
   const stats = [
     {
       _id: "1",
@@ -157,28 +166,28 @@ const Dashboard = () => {
     {
       _id: "2",
       label: "COMPLETED TASK",
-      total: totals["completed"] || 0,
+      total: groupedByStage.completed || 0,
       icon: <MdAdminPanelSettings />,
       bg: "bg-[#0f766e]",
     },
     {
       _id: "3",
       label: "TASK IN PROGRESS ",
-      total: totals["in progress"] || 0,
+      total: groupedByStage.inProgress || 0,
       icon: <MdEdit />,
       bg: "bg-[#f59e0b]",
     },
     {
       _id: "4",
       label: "TODOS",
-      total: totals["todo"] || 0,
+      total: groupedByStage.todo || 0,
       icon: <FaArrowsToDot />,
       bg: "bg-[#be185d]",
     },
     {
       _id: "5",
       label: "OVERDUE TASKS",
-      total: totals["overdue"] || totals["Overdue"] || 0,
+      total: groupedByStage.overdue || 0,
       icon: <MdKeyboardArrowDown />,
       bg: "bg-[#dc2626]",
     },
@@ -204,6 +213,17 @@ const Dashboard = () => {
     );
   };
 
+  // Prepare the chart data
+  const chartData = [
+    { label: "Todo", value: groupedByStage.todo },
+    { label: "In Progress", value: groupedByStage.inProgress },
+    { label: "Completed", value: groupedByStage.completed },
+    { label: "Overdue", value: groupedByStage.overdue },
+  ];
+
+  // Log the chart data to verify
+  console.log("Chart Data:", chartData);
+
   return (
     <div className='h-full py-4'>
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4'>
@@ -214,9 +234,9 @@ const Dashboard = () => {
 
       <div className='w-full bg-white my-16 p-4 rounded shadow-sm'>
         <h4 className='text-xl text-gray-600 font-semibold'>
-          Chart by Priority
+          Chart by Stage
         </h4>
-        <Chart data={data?.graphData} />
+        <Chart data={chartData} />
       </div>
 
       <div className='w-full flex flex-col md:flex-row gap-4 2xl:gap-10 py-8'>
@@ -226,5 +246,7 @@ const Dashboard = () => {
     </div>
   );
 };
+
+
 
 export default Dashboard;

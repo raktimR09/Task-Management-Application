@@ -97,7 +97,7 @@ const TaskCard = ({ task }) => {
     try {
       const res = await deleteSubTask({ taskId: task._id, subtaskId }).unwrap();
       toast.success(res?.message);
-      window.location.reload(); // 🔄 Reload after delete
+      window.location.reload();
     } catch (error) {
       console.error("Error deleting subtask:", error);
       toast.error("Failed to delete subtask");
@@ -106,12 +106,12 @@ const TaskCard = ({ task }) => {
 
   const handleEditSubTask = () => {
     setEditOpen(false);
-    window.location.reload(); // 🔄 Reload after edit
+    window.location.reload();
   };
 
   const handleSubTaskModalClose = () => {
     setOpen(false);
-    window.location.reload(); // 🔄 Reload after add subtask
+    window.location.reload();
   };
 
   return (
@@ -119,7 +119,7 @@ const TaskCard = ({ task }) => {
       <div className="w-full h-fit bg-white shadow-md p-4 rounded">
         <div className="w-full flex justify-between">
           {renderTaskStatus()}
-          {user?.isAdmin && <TaskDialog task={task} />}
+          <TaskDialog task={task} />
         </div>
 
         <div className="flex items-center gap-2 mt-2">
@@ -167,51 +167,60 @@ const TaskCard = ({ task }) => {
         {/* Subtasks */}
         <div className="py-4 border-t border-gray-200">
           {task?.subTasksWithPriority?.length > 0 ? (
-            task.subTasksWithPriority.map((sub, index) => (
-              <div key={index} className="mb-4">
-                <div className="flex justify-between items-start">
-                  <h5 className="text-base font-semibold text-black">{sub.title}</h5>
-                  {user?.isAdmin && !task?.isLocked && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                        onClick={() => handleEdit(sub)}
-                      >
-                        <FaEdit /> Edit
-                      </button>
-                      <button
-                        className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
-                        onClick={() => handleDeleteSubTask(sub._id)}
-                      >
-                        <FaTrashAlt /> Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="pl-2 text-sm text-gray-700 space-y-1 mt-1">
-                  <div>⏰ {formatDate(new Date(sub.deadline))}</div>
-                  <div>{renderSubtaskStatus(sub)}</div>
-                  <div>
-                    <span className="bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium inline-block">
-                      {sub.tag}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    {sub.members?.map((m, i) => (
-                      <div
-                        key={i}
-                        className={clsx(
-                          "w-6 h-6 rounded-full text-white flex items-center justify-center text-xs",
-                          BGS[i % BGS.length]
-                        )}
-                      >
-                        <UserInfo user={m} />
+            task.subTasksWithPriority.map((sub, index) => {
+              const isSubCompleted = sub?.stage?.toLowerCase() === "completed";
+              const isSubExpired =
+                !isSubCompleted && new Date(sub.deadline) < new Date();
+              const disableActions = isSubCompleted || isSubExpired;
+
+              return (
+                <div key={index} className="mb-4">
+                  <div className="flex justify-between items-start">
+                    <h5 className="text-base font-semibold text-black">
+                      {sub.title}
+                    </h5>
+                    {user?.isAdmin && !task?.isLocked && !disableActions && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                          onClick={() => handleEdit(sub)}
+                        >
+                          <FaEdit /> Edit
+                        </button>
+                        <button
+                          className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
+                          onClick={() => handleDeleteSubTask(sub._id)}
+                        >
+                          <FaTrashAlt /> Delete
+                        </button>
                       </div>
-                    ))}
+                    )}
+                  </div>
+                  <div className="pl-2 text-sm text-gray-700 space-y-1 mt-1">
+                    <div>⏰ {formatDate(new Date(sub.deadline))}</div>
+                    <div>{renderSubtaskStatus(sub)}</div>
+                    <div>
+                      <span className="bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium inline-block">
+                        {sub.tag}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {sub.members?.map((m, i) => (
+                        <div
+                          key={i}
+                          className={clsx(
+                            "w-6 h-6 rounded-full text-white flex items-center justify-center text-xs",
+                            BGS[i % BGS.length]
+                          )}
+                        >
+                          <UserInfo user={m} />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <span className="text-gray-500">No Sub Task</span>
           )}
@@ -220,7 +229,7 @@ const TaskCard = ({ task }) => {
         <div className="w-full pb-2">
           <button
             onClick={() => setOpen(true)}
-            disabled={task?.isLocked || !user?.isAdmin}
+            disabled={task?.isLocked || !user?.isAdmin || isCompleted || isExpired}
             className="w-full flex gap-4 items-center text-sm text-gray-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
           >
             <IoMdAdd className="text-lg" />
@@ -232,7 +241,7 @@ const TaskCard = ({ task }) => {
       {/* Modals */}
       <AddSubTask
         open={open}
-        setOpen={handleSubTaskModalClose} // 🔄 triggers reload after close
+        setOpen={handleSubTaskModalClose}
         id={task._id}
         team={task.team}
       />
@@ -242,7 +251,7 @@ const TaskCard = ({ task }) => {
           setOpen={setEditOpen}
           subTask={selectedSubTask}
           team={task.team}
-          onSave={handleEditSubTask} // 🔄 triggers reload
+          onSave={handleEditSubTask}
         />
       )}
     </>

@@ -87,7 +87,7 @@ export const taskApiSlice=apiSlice.injectEndpoints({
 
         uploadTaskDocuments: builder.mutation({
             query: ({ taskId, formData }) => ({
-              url: `/tasks/upload/${taskId}`,
+              url: `/task/upload/${taskId}`,
               method: "POST",
               body: formData,
               credentials: "include",
@@ -121,6 +121,15 @@ export const taskApiSlice=apiSlice.injectEndpoints({
                     credentials:"include",
                 }),
             }),
+
+        
+        deleteTaskDocument: builder.mutation({
+            query: ({ taskId, docId }) => ({
+                  url: `/task/${taskId}/documents/${docId}`,
+                  method: 'DELETE',
+            }),
+            }),
+              
     }),
 });
 
@@ -136,5 +145,6 @@ export const{useGetDashboardStatsQuery,
     useDeleteRestoreTaskMutation,
     useUpdateSubTaskMutation,
     useDeleteSubTaskMutation,
-    useUploadTaskDocumentsMutation
+    useUploadTaskDocumentsMutation,
+    useDeleteTaskDocumentMutation
 }=taskApiSlice
