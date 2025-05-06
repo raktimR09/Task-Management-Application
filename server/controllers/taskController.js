@@ -1,8 +1,10 @@
+import mongoose from 'mongoose';
 import Notice from "../models/notification.js";
 import Task from "../models/task.js";
 import User from "../models/user.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -91,42 +93,58 @@ export const duplicateTask = async (req, res) => {
 
 export const postTaskActivity = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // Task ID
     const { userId } = req.user;
-    const { type, activity } = req.body;
+    const { type, activity, subtaskId } = req.body;
 
+    if (!subtaskId) {
+      return res.status(400).json({ status: false, message: "Subtask ID is required" });
+    }
+
+    // Fetch the task and locate the subtask
     const task = await Task.findById(id);
     if (!task) {
       return res.status(404).json({ status: false, message: "Task not found" });
     }
 
-    // Prepare activity data with date explicitly set to the current time
-    const data = {
+    const subtask = task.subTasks.id(subtaskId);
+    if (!subtask) {
+      return res.status(404).json({ status: false, message: "Subtask not found" });
+    }
+
+    // Construct and push the new activity into the subtask
+    const activityData = {
       type,
       activity,
       by: userId,
       date: new Date(),
     };
+    subtask.activities.push(activityData);
 
-    // Push the new activity to the task's activities array
-    task.activities.push(data);
+    // Update subtask stage based on activity type
+    if (type.toLowerCase() === "completed") {
+      subtask.stage = "completed";
+    } else if (subtask.stage === "todo") {
+      subtask.stage = "in progress";
+    }
 
-    // Update task stage if it's currently "todo"
     if (task.stage === "todo") {
       task.stage = "in progress";
     }
 
-    // Save the task with the new activity and possibly updated stage
+    if (task.subTasks.every(st => st.stage === "completed")) {
+      task.stage = "completed";
+    } 
+
+    // Save the whole task document (subtask is embedded)
     await task.save();
 
-    res.status(200).json({ status: true, message: "Activity posted successfully." });
+    return res.status(200).json({ status: true, message: "Subtask activity posted successfully." });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return res.status(400).json({ status: false, message: error.message });
   }
 };
-
-
 
 export const dashboardStatistics = async (req, res) => {
   try {
@@ -249,7 +267,7 @@ export const getTask = async (req, res) => {
         select: "name title role email",
       })
       .populate({
-        path: "activities.by",
+        path: "subTasks.activities.by",
         select: "name",
       })
       .populate({
@@ -310,6 +328,7 @@ export const createSubTask = async (req, res) => {
 };
 
 
+
 export const updateSubTask = async (req, res) => {
   const { id } = req.params;
   const { title, deadline, priority, tag, members } = req.body;
@@ -347,6 +366,7 @@ export const updateSubTask = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 export const updateTask = async (req, res) => {
@@ -557,3 +577,185 @@ export const deleteTaskDocument = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const autoAssignUsersToSubtask = async (req, res) => {
+  try {
+    const { taskId, subtaskId } = req.params;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found." });
+    }
+
+    // Find the subtask you want to assign users to
+    const targetSubtask = task.subTasks.id(subtaskId);
+    if (!targetSubtask) {
+      return res.status(404).json({ status: false, message: "Subtask not found." });
+    }
+
+    // Collect all members from lower priority subtasks
+    const lowerPriorityMembers = new Set();
+    task.subTasks.forEach((sub) => {
+      // Assuming your subtask priority virtual field exists
+      const now = new Date();
+      const deadline = sub.deadline || sub.date || now;
+      const diffInMs = deadline - now;
+      const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24));
+      let priority = "low";
+      if (diffInDays <= 2) priority = "high";
+      else if (diffInDays <= 7) priority = "medium";
+      else if (diffInDays <= 15) priority = "normal";
+
+      if (priority === "low"||priority==="medium"||priority==="normal") {
+        sub.members.forEach((member) => lowerPriorityMembers.add(member.toString()));
+      }
+    });
+
+    if (lowerPriorityMembers.size === 0) {
+      return res.status(400).json({ status: false, message: "No users found in lower priority subtasks." });
+    }
+
+    // Assign these members to the target subtask
+    const existingMemberIds = targetSubtask.members.map(m => m.toString());
+    const newMembers = Array.from(lowerPriorityMembers).filter(
+      m => !existingMemberIds.includes(m)
+    );
+
+    targetSubtask.members.push(...newMembers);
+
+    await task.save();
+
+    return res.status(200).json({
+      status: true,
+      message: "Users assigned successfully from lower priority subtasks.",
+      subtask: targetSubtask,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ status: false, message: "Server error." });
+  }
+};
+
+export const assignMissingUsersToHighPrioritySubtasks = async (req, res) => {
+  try {
+    const { taskId } = req.params;
+
+    // 1) Load the task
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ status: false, message: 'Task not found.' });
+    }
+
+    const now = new Date();
+
+    // 2) Gather all user IDs assigned in any subtask
+    const assignedSet = new Set();
+    task.subTasks.forEach(sub => {
+      (sub.members || []).forEach(m => assignedSet.add(m.toString()));
+    });
+
+    // 3) Find users in overdue subtasks
+    const overdueUsers = new Set();
+    task.subTasks.forEach(sub => {
+      const deadline = new Date(sub.deadline || sub.date || now);
+      if (sub.stage !== 'completed' && deadline < now) {
+        (sub.members || []).forEach(m => overdueUsers.add(m.toString()));
+      }
+    });
+
+    // 4) Determine missing team members
+    const teamMemberIds = task.team.map(m => m.toString());
+    const missingTeamMembers = teamMemberIds.filter(id => !assignedSet.has(id));
+
+    // 5) Combine missing team members and overdue users
+    const allToAssign = Array.from(new Set([...missingTeamMembers, ...overdueUsers]));
+
+    if (allToAssign.length === 0) {
+      return res.status(200).json({
+        status: true,
+        message: 'All relevant users are already assigned to subtasks.',
+      });
+    }
+
+    // 6) Get high-priority subtasks
+    const highPrioritySubs = task.subTasksWithPriority.filter(sub => sub.priority === 'high');
+
+    if (highPrioritySubs.length === 0) {
+      return res.status(400).json({
+        status: false,
+        message: 'No high-priority subtasks found to assign users.',
+      });
+    }
+
+    // 7) Assign users to each high-priority subtask
+    highPrioritySubs.forEach(updatedSub => {
+      const originalSub = task.subTasks.id(updatedSub._id);
+      const existing = new Set((originalSub.members || []).map(m => m.toString()));
+
+      allToAssign.forEach(id => {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          existing.add(id);
+        }
+      });
+
+      // 💥 Correct usage: new mongoose.Types.ObjectId(id)
+      originalSub.members = Array.from(existing).map(id => new mongoose.Types.ObjectId(id));
+    });
+
+    // 8) Save
+    await task.save();
+
+    return res.status(200).json({
+      status: true,
+      message: 'Missing and overdue users have been assigned to high-priority subtasks.',
+      updatedSubtaskIds: highPrioritySubs.map(s => s._id),
+    });
+
+  } catch (error) {
+    console.error('assignMissingUsersToHighPrioritySubtasks error:', error);
+    return res.status(500).json({ status: false, message: 'Server error.' });
+  }
+};
+
+// Controller method to get the file preview
+export const getFilePreview = async (req, res) => {
+  const { taskId, docId } = req.params;
+
+  try {
+    // Find the task by its ID
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    // Find the document by its ID
+    const doc = task.documents.find(d => d._id.toString() === docId);
+
+    if (!doc) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    // Assuming files are stored in a folder on the server
+    const filePath = path.resolve(__dirname, `../uploads/${doc.fileName}`);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found' });
+    }
+
+    // Send file details (e.g., file path, file type) for preview
+    res.json({
+      fileName: doc.fileName,
+      filePath: `/uploads/${doc.fileName}`, // assuming files are served from a public folder
+      fileType: doc.fileType, // e.g., 'image/jpeg', 'application/pdf', etc.
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+
+

@@ -16,6 +16,9 @@ import {
   deleteSubTask,
   getTaskDocument,
   deleteTaskDocument,
+  autoAssignUsersToSubtask,
+  assignMissingUsersToHighPrioritySubtasks,
+  getFilePreview,
 } from "../controllers/taskController.js";
 import { isAdminRoute, protectRoute } from "../middlewares/authMiddleware.js";
 import upload from '../utils/multer.js';
@@ -53,10 +56,14 @@ router.delete(
 
 router.post('/upload/:taskId', upload.array('documents'), uploadTaskDocument);
 
-router.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 router.get('/:taskId/documents/:docName', getTaskDocument);
 
+
 router.delete('/:taskId/documents/:docId', deleteTaskDocument);
+
+router.post('/auto-assign/:taskId/:subtaskId', autoAssignUsersToSubtask);
+router.post('/assign-missing-high/:taskId/:subtaskId', assignMissingUsersToHighPrioritySubtasks);
+
 
 
 

@@ -130,6 +130,33 @@ export const taskApiSlice=apiSlice.injectEndpoints({
             }),
             }),
               
+            autoAssignUsersToHighPrioritySubtasks: builder.mutation({
+                query: ({ taskId,subtaskId }) => ({
+                  url: `/task/auto-assign/${taskId}/${subtaskId}`, // Create this API on the backend
+                  method: "POST", // Update method
+                  body:{},
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include", 
+                }),
+              }),
+
+              assignMissingUsersToHighPrioritySubtasks: builder.mutation({
+                query: ({ taskId,subtaskId }) => ({
+                  url: `/task/assign-missing-high/${taskId}/${subtaskId}`,
+                  method: "POST",
+                  body: {},
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                }),
+              }),
+
+              getFilePreview: builder.query({
+                query: ({ taskId, docId }) => ({
+                  url: `/task/${taskId}/documents/${docId}/preview`,
+                  method: "GET",
+                  credentials: "include",
+                }),
+              }),
     }),
 });
 
@@ -146,5 +173,8 @@ export const{useGetDashboardStatsQuery,
     useUpdateSubTaskMutation,
     useDeleteSubTaskMutation,
     useUploadTaskDocumentsMutation,
-    useDeleteTaskDocumentMutation
+    useDeleteTaskDocumentMutation,
+    useAutoAssignUsersToHighPrioritySubtasksMutation,
+    useAssignMissingUsersToHighPrioritySubtasksMutation,
+    useGetFilePreviewQuery
 }=taskApiSlice

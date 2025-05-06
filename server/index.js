@@ -39,7 +39,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ✅ Serve uploaded files statically
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "/uploads")));
+console.log(express.static(path.join(__dirname, "/uploads")));
+console.log(path.join(__dirname, '/uploads'))
 
 // API routes
 app.use("/api", routes);

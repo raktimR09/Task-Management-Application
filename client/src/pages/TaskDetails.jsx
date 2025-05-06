@@ -28,10 +28,13 @@ import Loading from "../components/Loader";
 import Button from "../components/Button";
 import { PRIOTITYSTYELS, TASK_TYPE, getInitials } from "../utils";
 import {
+  useAssignMissingUsersToHighPrioritySubtasksMutation,
+  useAutoAssignUsersToHighPrioritySubtasksMutation,
   useDeleteTaskDocumentMutation,
   useGetSingleTaskQuery,
   usePostTaskActivityMutation,
 } from "../redux/slices/api/taskApiSlice";
+import { SiGooglesearchconsole } from "react-icons/si";
 
 const ICONS = {
   high: <MdKeyboardDoubleArrowUp />,
@@ -92,27 +95,244 @@ const act_types = [
   "Assigned",
 ];
 
+
+const Activities = ({ id, refetch }) => {
+  const { user } = useSelector((state) => state.auth);
+  const [selectedType, setSelectedType] = useState(act_types[0]);
+  const [selectedSubtask, setSelectedSubtask] = useState("");
+  const [text, setText] = useState("");
+
+  const [postActivity, { isLoading }] = usePostTaskActivityMutation();
+  const { data } = useGetSingleTaskQuery({ id });
+
+  const subtasks = data?.task?.subTasks || [];
+  const isAssignedUser = data?.task?.team?.some((m) => m?._id === user?._id);
+  const isAdmin = user?.isAdmin === true;
+
+  // Flatten activities by subtask for admin feed
+  const allActivitiesBySubtask = subtasks.map((st) => ({
+    subtaskTitle: st.title,
+    activities: st.activities || [],
+  }));
+
+  // For non-admin, only show the selected subtask’s activities
+  const selectedSubtaskObj = subtasks.find((s) => s._id === selectedSubtask);
+  const activity = selectedSubtaskObj?.activities || [];
+
+  const handleSubmit = async () => {
+    if (!text || !selectedSubtask) return;
+
+    try {
+      const activityData = {
+        type: selectedType.toLowerCase(),
+        activity: text,
+        subtaskId: selectedSubtask,
+      };
+      const result = await postActivity({ data: activityData, id }).unwrap();
+      toast.success(result?.message);
+      setText("");
+      setSelectedSubtask("");
+      refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error("Something went wrong!");
+    }
+  };
+
+  const Card = ({ item }) => (
+    <div className="flex space-x-4">
+      <div className="flex flex-col items-center flex-shrink-0">
+        <div className="w-10 h-10 flex items-center justify-center">
+          {TASKTYPEICON[item?.type]}
+        </div>
+        <div className="w-full flex items-center">
+          <div className="w-0.5 bg-gray-300 h-full"></div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-y-1 mb-8">
+        <p className="font-semibold">{item?.by?.name}</p>
+        <div className="text-gray-500 space-y-1">
+          <span className="capitalize block">{item?.type}</span>
+          <span className="text-sm text-gray-400">
+            {moment(item?.date).format("MMMM Do YYYY, h:mm A")}
+          </span>
+        </div>
+        <div className="text-gray-700">{item?.activity}</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="w-full flex gap-10 2xl:gap-20 min-h-screen px-10 py-8 bg-white shadow rounded-md justify-between overflow-y-auto">
+      {/* Activity Feed */}
+      <div className="w-full md:w-1/2">
+        <h4 className="text-gray-600 font-semibold text-lg mb-5">Subtask Activities</h4>
+
+        {isAdmin ? (
+          // Admin sees all subtasks and their activities
+          allActivitiesBySubtask.map(({ subtaskTitle, activities }) => (
+            <div key={subtaskTitle} className="mb-8">
+              <h5 className="font-medium text-gray-700 mb-3">{subtaskTitle}</h5>
+              {activities.length > 0 ? (
+                activities.map((act, idx) => <Card key={idx} item={act} />)
+              ) : (
+                <p className="text-gray-400 italic">No activity for this subtask.</p>
+              )}
+            </div>
+          ))
+        ) : (
+          // Regular users select a subtask to view
+          <>
+            {!selectedSubtask ? (
+              <p className="text-gray-400 italic">
+                Select a subtask to view its activity log.
+              </p>
+            ) : activity.length > 0 ? (
+              activity.map((el, idx) => <Card key={idx} item={el} />)
+            ) : (
+              <p className="text-gray-400 italic">
+                No activity recorded for this subtask.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Add Activity: only visible if user is assigned to the task */}
+      {isAssignedUser && (
+        <div className="w-full md:w-1/3">
+          <h4 className="text-gray-600 font-semibold text-lg mb-5">Add Activity</h4>
+
+          {/* Subtask Dropdown (all subtasks shown since admin doesn’t need to select for viewing) */}
+          <label className="block mb-2">
+            <span className="text-gray-700">For Subtask:</span>
+            <select
+              className="mt-1 block w-full border border-gray-300 rounded p-2"
+              value={selectedSubtask}
+              onChange={(e) => setSelectedSubtask(e.target.value)}
+            >
+              <option value="">-- Select a subtask --</option>
+              {subtasks.map((st) => (
+                <option key={st._id} value={st._id}>
+                  {st.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* Activity Type Selection */}
+          <div className="flex flex-wrap gap-5 mb-4">
+            {act_types.map((item) => (
+              <label key={item} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="activityType"
+                  checked={selectedType === item}
+                  onChange={() => setSelectedType(item)}
+                  className="w-4 h-4"
+                />
+                <span>{item}</span>
+              </label>
+            ))}
+          </div>
+
+          {/* Activity Description */}
+          <textarea
+            rows={6}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Describe your activity…"
+            className="w-full border border-gray-300 rounded p-3 focus:ring-2 ring-blue-500"
+          />
+
+          {/* Submit Button */}
+          <div className="mt-4">
+            {isLoading ? (
+              <Loading />
+            ) : (
+              <Button
+                type="button"
+                label="Submit"
+                onClick={handleSubmit}
+                disabled={!text || !selectedSubtask}
+                className="bg-blue-600 text-white rounded px-4 py-2"
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const TaskDetails = () => {
   const { id } = useParams();
   const { user } = useSelector((state) => state.auth);
+  if (!id) {
+    console.error("Task ID is missing!");
+    return <div className="p-4 text-red-500">No task selected.</div>;
+  }
   const { data, isLoading, refetch } = useGetSingleTaskQuery({ id });
   const [selected, setSelected] = useState(0);
   const [deleteTaskDocument] = useDeleteTaskDocumentMutation(); // Mutation for document deletion
   const [previewDoc, setPreviewDoc] = useState(null);
   const task = data?.task;
+  const [autoAssignUsers] = useAutoAssignUsersToHighPrioritySubtasksMutation();
+  const [assignMissingUsers] = useAssignMissingUsersToHighPrioritySubtasksMutation();
 
-  const handleCompleteSubTask = async (subtaskId) => {
+ 
+  const handleAutoAssignUsersClick = async (taskId, subtaskId, priority) => {
+    console.log("Task ID:", taskId);
+    console.log("Subtask ID:", subtaskId);
+    console.log("Priority:", priority);
+  
     try {
-      const response = await updateCompletionSubTask({ taskId: id, subtaskId }).unwrap();
-      toast.success(response?.message || "Subtask marked as completed");
+      const res = await autoAssignUsers({ taskId, subtaskId }).unwrap();
+      console.log("Auto-assign success:", res);
+      toast.success('Users added to high priority subtask!');
       refetch();
     } catch (error) {
+      console.error("Auto-assign failed. Error object:", error);
+      if (error?.data) {
+        console.error("Error response from server:", error.data);
+        toast.error(error.data.message || "Server error while auto-assigning users.");
+      } else {
+        toast.error("Unexpected error while auto-assigning users.");
+      }
+    }
+  };  
+
+  const handleAssignMissingUsers = async (taskId,subtaskId,priority) => {
+    try {
+      console.log("Task ID:", taskId);
+      console.log("Subtask ID:", subtaskId);
+      console.log("Priority:", priority);
+      const res = await assignMissingUsers({ taskId,subtaskId }).unwrap();
+      toast.success('Free users successfully assigned!');
+      refetch();  // Refetch the task data after the update
+    } catch (error) {
+      toast.error('Error while assigning missing users.');
       console.error(error);
-      toast.error("Failed to mark subtask as completed");
     }
   };
 
-  const handlePreviewClick = (doc) => setPreviewDoc(doc);
+  const handlePreviewClick = (doc) => {
+    console.log(doc.path);
+    console.log(doc.name)
+    if (doc.path) {
+      const normalizedPath = doc.path.replace(/\\/g, '/'); // Convert backslashes to forward slashes
+      const fileName = normalizedPath.split('/').pop(); // Get only the file name
+      const backendURL = `http://localhost:8800/uploads/${fileName}`; // Adjust if your Express server runs on a different port
+      console.log("Preview URL:", backendURL);
+      //window.open(backendURL, '_blank');
+      setPreviewDoc({ ...doc, path: backendURL });
+        } else {
+      console.warn('Document path is missing or invalid:', doc);
+    }
+  };
+  
+  
+  
   const handleClosePreview = () => setPreviewDoc(null);
 
   const handleDeleteDocument = async (docId) => {
@@ -192,105 +412,127 @@ const TaskDetails = () => {
 
                 {/* Sub-Tasks */}
                 <div className='space-y-4 py-6'>
-                  <p className='text-gray-500 font-semibold text-sm'>SUB-TASKS</p>
-                  <div className='space-y-8'>
-                    {task?.subTasks?.map((el, index) => (
-                      <div key={index} className='flex gap-3 items-start'>
-                        <div className='w-10 h-10 flex items-center justify-center rounded-full bg-violet-100'>
-                          <MdTaskAlt className='text-violet-600' size={26} />
-                        </div>
-                        <div className='space-y-1 w-full'>
-                          <div className='flex gap-2 items-center justify-between flex-wrap'>
-                            <div className='flex items-center gap-3'>
-                              <span className='text-sm text-gray-500'>
-                                {moment(el?.date).format("MMM Do YYYY")}
-                              </span>
-                              <span className='px-2 py-0.5 text-sm rounded-full bg-violet-100 text-violet-700 font-semibold'>
-                                {el?.tag}
-                              </span>
-                            </div>
+  <p className='text-gray-500 font-semibold text-sm'>SUB-TASKS</p>
 
-                            {el?.assignedUsers?.some((u) => u?._id === user?._id) && (
-                              <div className='flex items-center gap-2'>
-                                <input
-                                  type='checkbox'
-                                  id={`subtask-${el._id}`}
-                                  checked={el?.isCompleted}
-                                  onChange={() => handleCompleteSubTask(el._id)}
-                                  disabled={el?.isCompleted}
-                                  className='w-4 h-4 cursor-pointer accent-green-600'
-                                />
-                                <label
-                                  htmlFor={`subtask-${el._id}`}
-                                  className={clsx(
-                                    'text-sm font-medium',
-                                    el?.isCompleted ? 'text-green-600 line-through' : 'text-gray-800'
-                                  )}
-                                >
-                                  {el?.isCompleted ? 'Completed' : 'Mark as Completed'}
-                                </label>
-                              </div>
-                            )}
-                          </div>
-                          <p className='text-gray-700'>{el?.title}</p>
-                          <div className='flex gap-2 mt-1 flex-wrap'>
-                            {el?.assignedUsers?.map((u, idx) => (
-                              <span
-                                key={idx}
-                                className='text-xs text-white bg-blue-500 px-2 py-1 rounded-full'
-                              >
-                                {u?.name}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+  <div className='space-y-8'>
+    {(task?.subTasksWithPriority || []).map((el, idx) => {
+      const isExpired = el.effectiveStage === "overdue";  // Use effectiveStage now
+
+      return (
+        <div key={idx} className='flex gap-3 items-start'>
+          
+          {/* Subtask Icon */}
+          <div className='w-10 h-10 flex items-center justify-center rounded-full bg-violet-100'>
+            <MdTaskAlt className='text-violet-600' size={26} />
+          </div>
+
+          {/* Subtask Info */}
+          <div className='space-y-2 w-full'>
+
+            {/* Subtask Title */}
+            <p className='text-gray-700 font-medium'>{el.title}</p>
+
+            {/* Assigned Members */}
+            {el.members?.length > 0 ? (
+              <div className='flex gap-2 mt-1 flex-wrap'>
+                {el.members.map((u, i) => (
+                  <span
+                    key={i}
+                    className='text-sm text-white bg-blue-500 px-2 py-1 rounded-full'
+                  >
+                    {u.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className='text-gray-400 text-xs italic mt-1'>No members assigned</p>
+            )}
+
+            {/* If expired */}
+            {isExpired && (
+              <div className='bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col'>
+                <p className='text-red-800 text-sm font-semibold'>
+                  ❌ Subtask Expired
+                </p>
+              </div>
+            )}
+
+            {/* If High Priority and NOT expired */}
+            {!isExpired && el.priority === 'high' && (
+              <div className='bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2'>
+                <p className='text-yellow-800 text-sm'>
+                  ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
+                </p>
+                <button
+                  onClick={() => handleAssignMissingUsers(task._id,el._id,el.priority)}
+                  className='bg-blue-600 text-white px-3 py-1 rounded-md w-max hover:bg-blue-700 transition'
+                >
+                  Assign Free Users
+                </button>
+                <button
+                  onClick={() => handleAutoAssignUsersClick(task._id, el._id, el.priority)}
+                  className='bg-yellow-600 text-white px-3 py-1 rounded-md w-max hover:bg-yellow-700 transition'
+                >
+                  Add Users from Other Tasks
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+
+
+
+
               </div>
 
               {/* RIGHT SIDE: Documents with Preview */}
               <div className='w-full md:w-1/2 space-y-8'>
-                <p className='text-lg font-semibold'>DOCUMENTS</p>
-                <div className='w-full flex flex-col gap-4'>
-                  {task?.documents?.length > 0 ? (
-                    task.documents.map((doc, idx) => (
-                      <div
-                        key={idx}
-                        className='p-4 border rounded-md hover:bg-gray-100 transition-all flex items-center justify-between'
-                      >
-                        <div>
-                          <span className='text-blue-600 font-medium'>
-                            Document {idx + 1}
-                          </span>
-                          <div className='text-sm text-gray-500'>{doc.name}</div>
-                        </div>
-                        <div className='flex items-center space-x-2'>
-                          <button
-                            onClick={() => handlePreviewClick(doc)}
-                            className='bg-blue-600 text-white px-4 py-2 rounded-md text-sm'
-                          >
-                            Preview
-                          </button>
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => handleDeleteDocument(doc._id)}
-                            className='bg-red-600 text-white px-4 py-2 rounded-md text-sm'
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className='text-gray-400'>No documents uploaded.</p>
-                  )}
-                </div>
-              </div>
+  <p className='text-lg font-semibold'>DOCUMENTS</p>
+  <div className='w-full flex flex-col gap-4'>
+    {task?.documents?.length > 0 ? (
+      task.documents.map((doc, idx) => (
+        <div
+          key={idx}
+          className='p-4 border rounded-md hover:bg-gray-100 transition-all flex items-center justify-between'
+        >
+          <div>
+            <span className='text-blue-600 font-medium'>
+              Document {idx + 1}
+            </span>
+            <div className='text-sm text-gray-500'>{doc.name}</div>
+          </div>
+          <div className='flex items-center space-x-2'>
+            <button
+              onClick={() => handlePreviewClick(doc)}
+              className='bg-blue-600 text-white px-4 py-2 rounded-md text-sm'
+            >
+              Preview
+            </button>
+            {/* Delete Button */}
+            <button
+              onClick={() => handleDeleteDocument(doc._id)}
+              className='bg-red-600 text-white px-4 py-2 rounded-md text-sm'
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))
+    ) : (
+      <p className='text-gray-400'>No documents uploaded.</p>
+    )}
+  </div>
+</div>
+
             </div>
           ) : (
-            <Activities activity={task?.activities} id={id} refetch={refetch} />
+            <Activities id={id} refetch={refetch} />
           )}
         </Tabs>
       </div>
@@ -325,66 +567,6 @@ const TaskDetails = () => {
   );
 };
 
-const Activities = ({ activity, id, refetch }) => {
-  const { user } = useSelector((state) => state.auth);
-  const [selected, setSelected] = useState(act_types[0]);
-  const [text, setText] = useState("");
-  const [postActivity, { isLoading }] = usePostTaskActivityMutation();
-  const { data } = useGetSingleTaskQuery({ id });
-  const isAssignedUser = data?.task?.team?.some((member) => member?._id === user?._id);
 
-  const handleSubmit = async () => {
-    try {
-      const activityData = { type: selected.toLowerCase(), activity: text };
-      const result = await postActivity({ data: activityData, id }).unwrap();
-      setText(""); toast.success(result?.message); refetch();
-    } catch (error) {
-      console.log(error); toast.error("Something went wrong!");
-    }
-  };
-
-  const Card = ({ item }) => (
-    <div className='flex space-x-4'>
-      <div className='flex flex-col items-center flex-shrink-0'>
-        <div className='w-10 h-10 flex items-center justify-center'>{TASKTYPEICON[item?.type]}</div>
-        <div className='w-full flex items-center'><div className='w-0.5 bg-gray-300 h-full'></div></div>
-      </div>
-      <div className='flex flex-col gap-y-1 mb-8'>
-        <p className='font-semibold'>{item?.by?.name}</p>
-        <div className='text-gray-500 space-y-1'>
-          <span className='capitalize block'>{item?.type}</span>
-          <span className='text-sm text-gray-400'>{moment(item?.date).format("MMMM Do YYYY, h:mm A")}</span>
-        </div>
-        <div className='text-gray-700'>{item?.activity}</div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className='w-full flex gap-10 2xl:gap-20 min-h-screen px-10 py-8 bg-white shadow rounded-md justify-between overflow-y-auto'>
-      <div className='w-full md:w-1/2'>
-        <h4 className='text-gray-600 font-semibold text-lg mb-5'>Activities</h4>
-        <div className='w-full'>
-          {activity?.slice(1).map((el, idx) => <Card key={idx} item={el}/>)}
-        </div>
-      </div>
-      {isAssignedUser && (
-        <div className='w-full md:w-1/3'>
-          <h4 className='text-gray-600 font-semibold text-lg mb-5'>Add Activity</h4>
-          <div className='w-full flex flex-wrap gap-5'>
-            {act_types.map(item => (
-              <div key={item} className='flex gap-2 items-center'>
-                <input type='checkbox' className='w-4 h-4' checked={selected===item} onChange={()=>setSelected(item)} />
-                <p>{item}</p>
-              </div>
-            ))}
-            <textarea rows={10} value={text} onChange={e=>setText(e.target.value)} placeholder='Type ......' className='bg-white w-full mt-10 border border-gray-300 outline-none p-4 rounded-md focus:ring-2 ring-blue-500' />
-            {isLoading ? <Loading/> : <Button type='button' label='Submit' onClick={handleSubmit} className='bg-blue-600 text-white rounded'/>}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default TaskDetails;
