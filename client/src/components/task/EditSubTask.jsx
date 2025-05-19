@@ -24,7 +24,7 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
     },
   });
 
-  const selectedMembers = watch("members");
+  const selectedMembers = watch("members") || [];
   const [updateSubTask] = useUpdateSubTaskMutation();
 
   const toggleMember = (memberId) => {
@@ -35,37 +35,39 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
   };
 
   const handleOnSubmit = async (data) => {
+    const subtaskData = {
+      title: data.title,
+      deadline: data.deadline,
+      priority: data.priority,
+      tag: data.tag,
+      members: Array.isArray(data.members) ? data.members : [],
+    };
+
+    console.log("Updating subtask:", subTask._id);
+    console.log("Payload:", subtaskData);
+    console.log("Subtask Stage:", subTask.stage);
+
     try {
-      // Ensure the correct data structure is passed
-      const subtaskData = {
-        title: data.title,
-        deadline: data.deadline,
-        priority: data.priority,
-        tag: data.tag,
-        members: data.members, // The array of member IDs
-      };
-      console.log(subTask._id);
-      // Correct API mutation for update
       const response = await updateSubTask({ id: subTask._id, data: subtaskData }).unwrap();
-      
+      setTimeout(() => {
+        setOpen(false);               // Close the modal
+        window.location.reload();     // Refresh the page
+      }, 500);
+
       if (response) {
         toast.success("Subtask updated successfully!");
         setTimeout(() => setOpen(false), 500);
       }
-    }catch (error) {
-        console.error("Update failed:", error?.data || error?.message || error);
-        toast.error("Failed to update subtask.");
-      }
-      
+    } catch (error) {
+      console.error("Update failed:", error?.data || error?.message || error);
+      toast.error("Failed to update subtask.");
+    }
   };
 
   return (
     <ModalWrapper open={open} setOpen={setOpen}>
       <form onSubmit={handleSubmit(handleOnSubmit)}>
-        <Dialog.Title
-          as="h2"
-          className="text-base font-bold leading-6 text-gray-900 mb-4"
-        >
+        <Dialog.Title as="h2" className="text-base font-bold leading-6 text-gray-900 mb-4">
           EDIT SUB-TASK
         </Dialog.Title>
 
@@ -76,9 +78,7 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
             name="title"
             label="Title"
             className="w-full rounded"
-            register={register("title", {
-              required: "Title is required!",
-            })}
+            register={register("title", { required: "Title is required!" })}
             error={errors.title?.message}
           />
 
@@ -89,9 +89,7 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
               name="deadline"
               label="Deadline"
               className="w-full rounded"
-              register={register("deadline", {
-                required: "Deadline is required!",
-              })}
+              register={register("deadline", { required: "Deadline is required!" })}
               error={errors.deadline?.message}
             />
             <Textbox
@@ -100,15 +98,11 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
               name="tag"
               label="Tag"
               className="w-full rounded"
-              register={register("tag", {
-                required: "Tag is required!",
-              })}
+              register={register("tag", { required: "Tag is required!" })}
               error={errors.tag?.message}
             />
             <div className="w-full">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Priority
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
               <select
                 {...register("priority", { required: "Priority is required!" })}
                 className="border border-gray-300 rounded w-full p-2 text-sm"
@@ -137,6 +131,8 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
                   <label key={member._id} className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      name="members"
+                      value={member._id}
                       checked={selectedMembers.includes(member._id)}
                       onChange={() => toggleMember(member._id)}
                     />

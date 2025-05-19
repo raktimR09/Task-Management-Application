@@ -29,11 +29,12 @@ const TaskCard = ({ task }) => {
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedSubTask, setSelectedSubTask] = useState(null);
+  const [previousStage, setPreviousStage] = useState(null);
   const [deleteSubTask] = useDeleteSubTaskMutation();
 
   const priority = task?.priority?.toLowerCase();
   const isCompleted = task?.stage?.toLowerCase() === "completed";
-  const isExpired = !isCompleted && new Date(task?.deadline) < new Date();
+  const isExpired = task?.stage?.toLowerCase() === "overdue";
 
   const renderTaskStatus = () => {
     if (isCompleted) {
@@ -90,6 +91,13 @@ const TaskCard = ({ task }) => {
 
   const handleEdit = (subtask) => {
     setSelectedSubTask(subtask);
+    setPreviousStage(null);
+    setEditOpen(true);
+  };
+
+  const handleExtend = (subtask) => {
+    setSelectedSubTask(subtask);
+    setPreviousStage(subtask.stage); // Save current stage before expiration
     setEditOpen(true);
   };
 
@@ -179,23 +187,37 @@ const TaskCard = ({ task }) => {
                     <h5 className="text-base font-semibold text-black">
                       {sub.title}
                     </h5>
-                    {user?.isAdmin && !task?.isLocked && !disableActions && (
+                    {user?.isAdmin && !task?.isLocked && (
                       <div className="flex items-center gap-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                          onClick={() => handleEdit(sub)}
-                        >
-                          <FaEdit /> Edit
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
-                          onClick={() => handleDeleteSubTask(sub._id)}
-                        >
-                          <FaTrashAlt /> Delete
-                        </button>
+                        {!disableActions && (
+                          <>
+                            <button
+                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                              onClick={() => handleEdit(sub)}
+                            >
+                              <FaEdit /> Edit
+                            </button>
+                            <button
+                              className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
+                              onClick={() => handleDeleteSubTask(sub._id)}
+                            >
+                              <FaTrashAlt /> Delete
+                            </button>
+                          </>
+                        )}
+
+                        {isSubExpired && !isSubCompleted && (
+                          <button
+                            className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
+                            onClick={() => handleExtend(sub)}
+                          >
+                            🕒 Extend
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
+
                   <div className="pl-2 text-sm text-gray-700 space-y-1 mt-1">
                     <div>⏰ {formatDate(new Date(sub.deadline))}</div>
                     <div>{renderSubtaskStatus(sub)}</div>
@@ -252,6 +274,7 @@ const TaskCard = ({ task }) => {
           subTask={selectedSubTask}
           team={task.team}
           onSave={handleEditSubTask}
+          previousStage={previousStage} // ✅ Pass previous stage
         />
       )}
     </>

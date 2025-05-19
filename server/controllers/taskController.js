@@ -112,12 +112,14 @@ export const postTaskActivity = async (req, res) => {
       return res.status(404).json({ status: false, message: "Subtask not found" });
     }
 
+    const now = new Date();
+
     // Construct and push the new activity into the subtask
     const activityData = {
       type,
       activity,
       by: userId,
-      date: new Date(),
+      date: now,
     };
     subtask.activities.push(activityData);
 
@@ -128,13 +130,17 @@ export const postTaskActivity = async (req, res) => {
       subtask.stage = "in progress";
     }
 
-    if (task.stage === "todo") {
-      task.stage = "in progress";
+    // Mark subtask as overdue if deadline passed and not completed
+    if (subtask.stage !== "completed" && subtask.deadline < now) {
+      subtask.stage = "overdue";
     }
 
+    // Update task stage based on subtask stages
     if (task.subTasks.every(st => st.stage === "completed")) {
       task.stage = "completed";
-    } 
+    } else if (task.stage === "todo") {
+      task.stage = "in progress";
+    }
 
     // Save the whole task document (subtask is embedded)
     await task.save();
@@ -145,6 +151,7 @@ export const postTaskActivity = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
 
 export const dashboardStatistics = async (req, res) => {
   try {
@@ -285,7 +292,6 @@ export const getTask = async (req, res) => {
   }
 };
 
-
 export const createSubTask = async (req, res) => {
   try {
     const { title, tag, deadline, members, priority } = req.body;
@@ -327,11 +333,9 @@ export const createSubTask = async (req, res) => {
   }
 };
 
-
-
 export const updateSubTask = async (req, res) => {
   const { id } = req.params;
-  const { title, deadline, priority, tag, members } = req.body;
+  const { title, deadline, priority, tag, members, previousStage } = req.body;
 
   try {
     const task = await Task.findOne({ "subTasks._id": id });
@@ -339,7 +343,6 @@ export const updateSubTask = async (req, res) => {
       return res.status(404).json({ message: "Subtask not found (parent task missing)" });
     }
 
-    // ❌ Prevent editing if parent task is locked (overdue and not completed)
     if (task.isLocked) {
       return res.status(403).json({
         message: "Task is locked (overdue) and cannot be edited.",
@@ -351,12 +354,48 @@ export const updateSubTask = async (req, res) => {
       return res.status(404).json({ message: "Subtask not found" });
     }
 
-    // ✅ Update subtask fields
-    subtask.title = title;
-    subtask.deadline = deadline;
-    subtask.priority = priority;
-    subtask.tag = tag;
-    subtask.members = members;
+    const wasExpired = subtask.stage === "overdue";
+    const isNowFuture = deadline && new Date(deadline) > new Date();
+
+    // Calculate if deadline is extended (compare new deadline with old deadline)
+    let deadlineExtended = false;
+    if (deadline && subtask.deadline) {
+      const oldDeadline = new Date(subtask.deadline);
+      const newDeadline = new Date(deadline);
+      deadlineExtended = newDeadline > oldDeadline;
+    }
+
+    // Update fields only if they exist in request
+    if (title) subtask.title = title;
+    if (deadline) subtask.deadline = deadline; // update after checking old deadline
+    if (priority) subtask.priority = priority;
+    if (tag) subtask.tag = tag;
+
+    // Update members only if provided
+    if (Array.isArray(members)) {
+      subtask.members = members.map((m) => new mongoose.Types.ObjectId(m));
+    }
+
+    // Restore stage from overdue only if valid and deadline extended or is now future
+    if (wasExpired && isNowFuture && previousStage && previousStage !== "overdue") {
+      // Use your existing logic to set stage based on activity
+      if (subtask.activities && subtask.activities.length > 0) {
+        subtask.stage = "in progress";
+      } else {
+        subtask.stage = "todo";
+      }
+      console.log("Subtask Stage restored from overdue:", subtask.stage);
+    }
+
+    // If deadline was extended but stage was not overdue, update stage based on activity
+    if (deadlineExtended) {
+      if (subtask.activities && subtask.activities.length > 0) {
+        subtask.stage = "in progress";
+      } else {
+        subtask.stage = "todo";
+      }
+      console.log("Subtask Stage updated due to deadline extension:", subtask.stage);
+    }
 
     await task.save();
 
@@ -366,6 +405,7 @@ export const updateSubTask = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 
@@ -379,21 +419,42 @@ export const updateTask = async (req, res) => {
       return res.status(404).json({ status: false, message: "Task not found" });
     }
 
-    // ❌ Prevent editing if task is locked (overdue)
+    const now = new Date();
+
+    // If task is locked (overdue)
     if (task.isLocked) {
-      return res.status(403).json({
-        status: false,
-        message: "Task is locked (overdue) and cannot be edited.",
-      });
+      console.log(task.deadline);
+      console.log(date);
+      // Allow only deadline extension (date change)
+      if (date && new Date(date) > task.deadline) {
+        task.deadline = new Date(date);
+        // Possibly update stage if extended deadline is now in future
+        if (stage) {
+          const newStage = stage.toLowerCase();
+          if (newStage === "completed") {
+            task.stage = "completed";
+          } else if (new Date(date) >= now) {
+            // If new deadline is in future, revert overdue status
+            task.stage = "in progress"; // or whatever stage fits your workflow
+          }
+        } 
+        await task.save();
+        return res.status(200).json({ status: true, message: "Deadline extended successfully." });
+      } else {
+        return res.status(403).json({
+          status: false,
+          message: "Task is locked (overdue). Only extending deadline is allowed.",
+        });
+      }
     }
 
+    // If not locked, allow full update
     if (title) task.title = title;
     if (date) task.deadline = new Date(date);
     if (team) task.team = team;
     if (assets) task.assets = assets;
 
-    // Handle overdue logic
-    const now = new Date();
+    // Handle overdue logic for stage
     const newDeadline = date ? new Date(date) : task.deadline;
     let finalStage = stage ? stage.toLowerCase() : task.stage;
 
@@ -411,6 +472,8 @@ export const updateTask = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
+
 
 export const trashTask = async (req, res) => {
   try {

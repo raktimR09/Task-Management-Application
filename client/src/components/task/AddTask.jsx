@@ -46,7 +46,7 @@ const AddTask = ({ open, setOpen, task }) => {
     try {
       const newData = {
         ...data,
-        deadline: new Date(data.deadline),
+        date: new Date(data.deadline),
         team,
         stage,
       };
@@ -72,7 +72,10 @@ const AddTask = ({ open, setOpen, task }) => {
       }
 
       toast.success(task?._id ? "Task updated successfully!" : "Task created successfully!");
-      setTimeout(() => setOpen(false), 500);
+      setTimeout(() => {
+        setOpen(false);               // Close the modal
+        window.location.reload();     // Refresh the page
+      }, 500);
     } catch (error) {
       console.error(error);
       toast.error("Something went wrong!");

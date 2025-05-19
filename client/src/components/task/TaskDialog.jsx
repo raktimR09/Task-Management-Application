@@ -58,7 +58,7 @@ const TaskDialog = ({ task }) => {
     }
   };
 
-  // Conditionally render items based on whether the task is locked (overdue)
+  // Build menu items
   const items = [
     {
       label: "Open Task",
@@ -72,8 +72,8 @@ const TaskDialog = ({ task }) => {
     },
   ];
 
-  // Disable other actions for overdue tasks
   if (!task?.isLocked) {
+    // Normal task: show Edit, Add Sub-Task, Duplicate
     items.push(
       {
         label: "Edit",
@@ -91,6 +91,13 @@ const TaskDialog = ({ task }) => {
         onClick: () => duplicateHandler(),
       }
     );
+  } else {
+    // Overdue (locked) task: replace Edit with Extend Task, disable Add Subtask and Duplicate
+    items.push({
+      label: "Extend Task",
+      icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
+      onClick: () => setOpenEdit(true),
+    });
   }
 
   return (

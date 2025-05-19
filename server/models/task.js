@@ -1,7 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 
 // Subtask Schema
-// Subtask Schema (updated with activities)
 const subTaskSchema = new Schema(
   {
     title: { type: String, required: true },
@@ -53,7 +52,6 @@ const subTaskSchema = new Schema(
   }
 );
 
-
 // Task Schema
 const taskSchema = new Schema(
   {
@@ -86,7 +84,9 @@ const taskSchema = new Schema(
   }
 );
 
-// Dynamic Priority for Task
+// --- Virtuals ---
+
+// Dynamic priority for Task
 taskSchema.virtual("priority").get(function () {
   if (!this.deadline) return "normal";
 
@@ -100,22 +100,13 @@ taskSchema.virtual("priority").get(function () {
   return "low";
 });
 
-// Effective Stage for Task (Overdue)
-taskSchema.virtual("effectiveStage").get(function () {
-  const now = new Date();
-  if (this.stage !== "completed" && this.deadline < now) {
-    return "overdue";
-  }
-  return this.stage;
-});
-
-// Is Task Locked
+// Is task locked (based on deadline and completion)
 taskSchema.virtual("isLocked").get(function () {
   const now = new Date();
   return this.stage !== "completed" && this.deadline < now;
 });
 
-// Computed priority + computed effective stage for each subtask
+// Computed priority + effective stage for each subtask (virtual only)
 taskSchema.virtual("subTasksWithPriority").get(function () {
   const now = new Date();
 
@@ -124,13 +115,13 @@ taskSchema.virtual("subTasksWithPriority").get(function () {
     const diffInMs = deadline - now;
     const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24));
 
-    // priority calculation
+    // priority
     let priority = "low";
     if (diffInDays <= 2) priority = "high";
     else if (diffInDays <= 7) priority = "medium";
     else if (diffInDays <= 15) priority = "normal";
 
-    // stage calculation (if expired but not completed)
+    // effective stage (computed only)
     let effectiveStage = sub.stage;
     if (sub.stage !== "completed" && deadline < now) {
       effectiveStage = "overdue";
@@ -144,30 +135,44 @@ taskSchema.virtual("subTasksWithPriority").get(function () {
   });
 });
 
-// Pre-save hook for auto-assigning users
-taskSchema.pre('save', function (next) {
-  if (!this.isModified('subTasks')) {
-    return next();
+// --- Pre-save Hook ---
+
+taskSchema.pre("save", function (next) {
+  const now = new Date();
+
+  // Update task stage to overdue if deadline has passed and not completed
+  if (this.stage !== "completed" && this.deadline < now) {
+    this.stage = "overdue";
   }
 
-  const lowMembers = new Set();
+  // Update each subtask's stage to overdue if deadline passed and not completed
   this.subTasks.forEach((sub) => {
-    if (sub.priority === 'low') {
-      (sub.members || []).forEach((m) => lowMembers.add(m.toString()));
+    if (sub.stage !== "completed" && sub.deadline < now) {
+      sub.stage = "overdue";
     }
   });
 
-  this.subTasks.forEach((sub) => {
-    if (sub.priority === 'high') {
-      const existing = new Set((sub.members || []).map((m) => m.toString()));
-      lowMembers.forEach((m) => existing.add(m));
-      sub.members = Array.from(existing);
-    }
-  });
+  // Auto-assign members from low-priority to high-priority subtasks
+  if (this.isModified("subTasks")) {
+    const lowMembers = new Set();
+    this.subTasks.forEach((sub) => {
+      if (sub.priority === "low") {
+        (sub.members || []).forEach((m) => lowMembers.add(m.toString()));
+      }
+    });
+
+    this.subTasks.forEach((sub) => {
+      if (sub.priority === "high") {
+        const existing = new Set((sub.members || []).map((m) => m.toString()));
+        lowMembers.forEach((m) => existing.add(m));
+        sub.members = Array.from(existing);
+      }
+    });
+  }
 
   next();
 });
 
-// Export the model
+// --- Model Export ---
 const Task = mongoose.model("Task", taskSchema);
 export default Task;

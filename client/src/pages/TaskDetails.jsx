@@ -95,7 +95,6 @@ const act_types = [
   "Assigned",
 ];
 
-
 const Activities = ({ id, refetch }) => {
   const { user } = useSelector((state) => state.auth);
   const [selectedType, setSelectedType] = useState(act_types[0]);
@@ -109,18 +108,26 @@ const Activities = ({ id, refetch }) => {
   const isAssignedUser = data?.task?.team?.some((m) => m?._id === user?._id);
   const isAdmin = user?.isAdmin === true;
 
-  // Flatten activities by subtask for admin feed
+  const taskStage = data?.task?.stage?.toLowerCase();
+  const canAddActivity =
+    isAssignedUser && taskStage !== "overdue" && taskStage !== "completed";
+
   const allActivitiesBySubtask = subtasks.map((st) => ({
     subtaskTitle: st.title,
     activities: st.activities || [],
   }));
 
-  // For non-admin, only show the selected subtask’s activities
   const selectedSubtaskObj = subtasks.find((s) => s._id === selectedSubtask);
   const activity = selectedSubtaskObj?.activities || [];
 
   const handleSubmit = async () => {
     if (!text || !selectedSubtask) return;
+
+    const selected = subtasks.find((s) => s._id === selectedSubtask);
+    if (!selected || selected.stage === "overdue" || selected.stage === "completed") {
+      toast.error("Cannot add activity to overdue or completed subtask.");
+      return;
+    }
 
     try {
       const activityData = {
@@ -169,7 +176,6 @@ const Activities = ({ id, refetch }) => {
         <h4 className="text-gray-600 font-semibold text-lg mb-5">Subtask Activities</h4>
 
         {isAdmin ? (
-          // Admin sees all subtasks and their activities
           allActivitiesBySubtask.map(({ subtaskTitle, activities }) => (
             <div key={subtaskTitle} className="mb-8">
               <h5 className="font-medium text-gray-700 mb-3">{subtaskTitle}</h5>
@@ -181,7 +187,6 @@ const Activities = ({ id, refetch }) => {
             </div>
           ))
         ) : (
-          // Regular users select a subtask to view
           <>
             {!selectedSubtask ? (
               <p className="text-gray-400 italic">
@@ -190,20 +195,17 @@ const Activities = ({ id, refetch }) => {
             ) : activity.length > 0 ? (
               activity.map((el, idx) => <Card key={idx} item={el} />)
             ) : (
-              <p className="text-gray-400 italic">
-                No activity recorded for this subtask.
-              </p>
+              <p className="text-gray-400 italic">No activity recorded for this subtask.</p>
             )}
           </>
         )}
       </div>
 
-      {/* Add Activity: only visible if user is assigned to the task */}
-      {isAssignedUser && (
+      {/* Add Activity */}
+      {canAddActivity && (
         <div className="w-full md:w-1/3">
           <h4 className="text-gray-600 font-semibold text-lg mb-5">Add Activity</h4>
 
-          {/* Subtask Dropdown (all subtasks shown since admin doesn’t need to select for viewing) */}
           <label className="block mb-2">
             <span className="text-gray-700">For Subtask:</span>
             <select
@@ -213,14 +215,22 @@ const Activities = ({ id, refetch }) => {
             >
               <option value="">-- Select a subtask --</option>
               {subtasks.map((st) => (
-                <option key={st._id} value={st._id}>
-                  {st.title}
+                <option
+                  key={st._id}
+                  value={st._id}
+                  disabled={st.stage === "overdue" || st.stage === "completed"}
+                >
+                  {st.title}{" "}
+                  {st.stage === "overdue"
+                    ? "(Overdue)"
+                    : st.stage === "completed"
+                    ? "(Completed)"
+                    : ""}
                 </option>
               ))}
             </select>
           </label>
 
-          {/* Activity Type Selection */}
           <div className="flex flex-wrap gap-5 mb-4">
             {act_types.map((item) => (
               <label key={item} className="flex items-center gap-2">
@@ -236,7 +246,6 @@ const Activities = ({ id, refetch }) => {
             ))}
           </div>
 
-          {/* Activity Description */}
           <textarea
             rows={6}
             value={text}
@@ -245,7 +254,6 @@ const Activities = ({ id, refetch }) => {
             className="w-full border border-gray-300 rounded p-3 focus:ring-2 ring-blue-500"
           />
 
-          {/* Submit Button */}
           <div className="mt-4">
             {isLoading ? (
               <Loading />
@@ -265,27 +273,35 @@ const Activities = ({ id, refetch }) => {
   );
 };
 
+
 const TaskDetails = () => {
   const { id } = useParams();
   const { user } = useSelector((state) => state.auth);
+
   if (!id) {
     console.error("Task ID is missing!");
     return <div className="p-4 text-red-500">No task selected.</div>;
   }
+
   const { data, isLoading, refetch } = useGetSingleTaskQuery({ id });
   const [selected, setSelected] = useState(0);
-  const [deleteTaskDocument] = useDeleteTaskDocumentMutation(); // Mutation for document deletion
+  const [deleteTaskDocument] = useDeleteTaskDocumentMutation();
   const [previewDoc, setPreviewDoc] = useState(null);
   const task = data?.task;
   const [autoAssignUsers] = useAutoAssignUsersToHighPrioritySubtasksMutation();
   const [assignMissingUsers] = useAssignMissingUsersToHighPrioritySubtasksMutation();
 
- 
+  // Helper: Check if subtask deadline is expired based on current date
+  const isSubtaskExpired = (deadline) => {
+    if (!deadline) return false; // No deadline means not expired
+    return moment(deadline).isBefore(moment(), 'day'); // expired if deadline is before today
+  };
+
   const handleAutoAssignUsersClick = async (taskId, subtaskId, priority) => {
     console.log("Task ID:", taskId);
     console.log("Subtask ID:", subtaskId);
     console.log("Priority:", priority);
-  
+
     try {
       const res = await autoAssignUsers({ taskId, subtaskId }).unwrap();
       console.log("Auto-assign success:", res);
@@ -300,16 +316,16 @@ const TaskDetails = () => {
         toast.error("Unexpected error while auto-assigning users.");
       }
     }
-  };  
+  };
 
-  const handleAssignMissingUsers = async (taskId,subtaskId,priority) => {
+  const handleAssignMissingUsers = async (taskId, subtaskId, priority) => {
     try {
       console.log("Task ID:", taskId);
       console.log("Subtask ID:", subtaskId);
       console.log("Priority:", priority);
-      const res = await assignMissingUsers({ taskId,subtaskId }).unwrap();
+      const res = await assignMissingUsers({ taskId, subtaskId }).unwrap();
       toast.success('Free users successfully assigned!');
-      refetch();  // Refetch the task data after the update
+      refetch();
     } catch (error) {
       toast.error('Error while assigning missing users.');
       console.error(error);
@@ -317,38 +333,28 @@ const TaskDetails = () => {
   };
 
   const handlePreviewClick = (doc) => {
-    console.log(doc.path);
-    console.log(doc.name)
     if (doc.path) {
-      const normalizedPath = doc.path.replace(/\\/g, '/'); // Convert backslashes to forward slashes
-      const fileName = normalizedPath.split('/').pop(); // Get only the file name
-      const backendURL = `http://localhost:8800/uploads/${fileName}`; // Adjust if your Express server runs on a different port
-      console.log("Preview URL:", backendURL);
-      //window.open(backendURL, '_blank');
+      const normalizedPath = doc.path.replace(/\\/g, '/');
+      const fileName = normalizedPath.split('/').pop();
+      const backendURL = `http://localhost:8800/uploads/${fileName}`;
       setPreviewDoc({ ...doc, path: backendURL });
-        } else {
+    } else {
       console.warn('Document path is missing or invalid:', doc);
     }
   };
-  
-  
-  
+
   const handleClosePreview = () => setPreviewDoc(null);
 
   const handleDeleteDocument = async (docId) => {
     try {
-      // Delete document via the API
       const response = await deleteTaskDocument({ taskId: id, docId }).unwrap();
       toast.success(response.message);
-
-      // Optimistically update the UI by refetching the task
       refetch();
     } catch (error) {
       console.error(error);
       toast.error('Failed to delete document');
     }
   };
-
 
   if (isLoading) {
     return (
@@ -370,10 +376,19 @@ const TaskDetails = () => {
               <div className='w-full md:w-1/2 space-y-8'>
                 {/* Priority and Stage */}
                 <div className='flex items-center gap-5'>
-                  <div className={clsx("flex gap-1 items-center text-base font-semibold px-3 py-1 rounded-full", PRIOTITYSTYELS[task?.priority], bgColor[task?.priority])}>
-                    <span className='text-lg'>{ICONS[task?.priority]}</span>
-                    <span className='uppercase'>{task?.priority} Priority</span>
-                  </div>
+                  {!["overdue", "completed"].includes(task?.stage?.toLowerCase()) && (
+                    <div
+                      className={clsx(
+                        "flex gap-1 items-center text-base font-semibold px-3 py-1 rounded-full",
+                        PRIOTITYSTYELS[task?.priority],
+                        bgColor[task?.priority]
+                      )}
+                    >
+                      <span className='text-lg'>{ICONS[task?.priority]}</span>
+                      <span className='uppercase'>{task?.priority} Priority</span>
+                    </div>
+                  )}
+
                   <div className='flex items-center gap-2'>
                     <div className={clsx("w-4 h-4 rounded-full", TASK_TYPE[task?.stage])} />
                     <span className='text-black uppercase'>{task?.stage}</span>
@@ -397,7 +412,10 @@ const TaskDetails = () => {
                   <p className='text-gray-600 font-semibold text-sm'>TASK TEAM</p>
                   <div className='space-y-3'>
                     {task?.team?.map((m, index) => (
-                      <div key={index} className='flex gap-4 py-2 items-center border-t border-gray-200'>
+                      <div
+                        key={index}
+                        className='flex gap-4 py-2 items-center border-t border-gray-200'
+                      >
                         <div className='w-10 h-10 rounded-full text-white flex items-center justify-center text-sm -mr-1 bg-blue-600'>
                           <span className='text-center'>{getInitials(m?.name)}</span>
                         </div>
@@ -412,124 +430,120 @@ const TaskDetails = () => {
 
                 {/* Sub-Tasks */}
                 <div className='space-y-4 py-6'>
-  <p className='text-gray-500 font-semibold text-sm'>SUB-TASKS</p>
+                  <p className='text-gray-500 font-semibold text-sm'>SUB-TASKS</p>
 
-  <div className='space-y-8'>
-    {(task?.subTasksWithPriority || []).map((el, idx) => {
-      const isExpired = el.effectiveStage === "overdue";  // Use effectiveStage now
+                  <div className='space-y-8'>
+                    {(task?.subTasksWithPriority || []).map((el, idx) => {
+                      // Compute expired state based on deadline date (fallback)
+                      const isExpired = isSubtaskExpired(el.deadline);
+                      // Debug log for each subtask status
+                      console.log(
+                        `Subtask: ${el.title}, Deadline: ${el.deadline}, Expired: ${isExpired}, Priority: ${el.priority}`
+                      );
 
-      return (
-        <div key={idx} className='flex gap-3 items-start'>
-          
-          {/* Subtask Icon */}
-          <div className='w-10 h-10 flex items-center justify-center rounded-full bg-violet-100'>
-            <MdTaskAlt className='text-violet-600' size={26} />
-          </div>
+                      return (
+                        <div key={idx} className='flex gap-3 items-start'>
+                          {/* Subtask Icon */}
+                          <div className='w-10 h-10 flex items-center justify-center rounded-full bg-violet-100'>
+                            <MdTaskAlt className='text-violet-600' size={26} />
+                          </div>
 
-          {/* Subtask Info */}
-          <div className='space-y-2 w-full'>
+                          {/* Subtask Info */}
+                          <div className='space-y-2 w-full'>
+                            {/* Subtask Title */}
+                            <p className='text-gray-700 font-medium'>{el.title}</p>
 
-            {/* Subtask Title */}
-            <p className='text-gray-700 font-medium'>{el.title}</p>
+                            {/* Assigned Members */}
+                            {el.members?.length > 0 ? (
+                              <div className='flex gap-2 mt-1 flex-wrap'>
+                                {el.members.map((u, i) => (
+                                  <span
+                                    key={i}
+                                    className='text-sm text-white bg-blue-500 px-2 py-1 rounded-full'
+                                  >
+                                    {u.name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className='text-gray-400 text-xs italic mt-1'>
+                                No members assigned
+                              </p>
+                            )}
 
-            {/* Assigned Members */}
-            {el.members?.length > 0 ? (
-              <div className='flex gap-2 mt-1 flex-wrap'>
-                {el.members.map((u, i) => (
-                  <span
-                    key={i}
-                    className='text-sm text-white bg-blue-500 px-2 py-1 rounded-full'
-                  >
-                    {u.name}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <p className='text-gray-400 text-xs italic mt-1'>No members assigned</p>
-            )}
+                            {/* If expired */}
+                            {isExpired && (
+                              <div className='bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col'>
+                                <p className='text-red-800 text-sm font-semibold'>
+                                  ❌ Subtask Expired
+                                </p>
+                              </div>
+                            )}
 
-            {/* If expired */}
-            {isExpired && (
-              <div className='bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col'>
-                <p className='text-red-800 text-sm font-semibold'>
-                  ❌ Subtask Expired
-                </p>
-              </div>
-            )}
-
-            {/* If High Priority and NOT expired */}
-            {!isExpired && el.priority === 'high' && (
-              <div className='bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2'>
-                <p className='text-yellow-800 text-sm'>
-                  ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
-                </p>
-                <button
-                  onClick={() => handleAssignMissingUsers(task._id,el._id,el.priority)}
-                  className='bg-blue-600 text-white px-3 py-1 rounded-md w-max hover:bg-blue-700 transition'
-                >
-                  Assign Free Users
-                </button>
-                <button
-                  onClick={() => handleAutoAssignUsersClick(task._id, el._id, el.priority)}
-                  className='bg-yellow-600 text-white px-3 py-1 rounded-md w-max hover:bg-yellow-700 transition'
-                >
-                  Add Users from Other Tasks
-                </button>
-              </div>
-            )}
-
-          </div>
-        </div>
-      );
-    })}
-  </div>
-</div>
-
-
-
-
-
+                            {/* If High Priority and NOT expired */}
+                            {!isExpired && el.priority === 'high' && (
+                              <div className='bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2'>
+                                <p className='text-yellow-800 text-sm'>
+                                  ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
+                                </p>
+                                <button
+                                  onClick={() => handleAssignMissingUsers(task._id, el._id, el.priority)}
+                                  className='bg-blue-600 text-white px-3 py-1 rounded-md w-max hover:bg-blue-700 transition'
+                                >
+                                  Assign Free Users
+                                </button>
+                                <button
+                                  onClick={() => handleAutoAssignUsersClick(task._id, el._id, el.priority)}
+                                  className='bg-yellow-600 text-white px-3 py-1 rounded-md w-max hover:bg-yellow-700 transition'
+                                >
+                                  Add Users from Other Tasks
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* RIGHT SIDE: Documents with Preview */}
               <div className='w-full md:w-1/2 space-y-8'>
-  <p className='text-lg font-semibold'>DOCUMENTS</p>
-  <div className='w-full flex flex-col gap-4'>
-    {task?.documents?.length > 0 ? (
-      task.documents.map((doc, idx) => (
-        <div
-          key={idx}
-          className='p-4 border rounded-md hover:bg-gray-100 transition-all flex items-center justify-between'
-        >
-          <div>
-            <span className='text-blue-600 font-medium'>
-              Document {idx + 1}
-            </span>
-            <div className='text-sm text-gray-500'>{doc.name}</div>
-          </div>
-          <div className='flex items-center space-x-2'>
-            <button
-              onClick={() => handlePreviewClick(doc)}
-              className='bg-blue-600 text-white px-4 py-2 rounded-md text-sm'
-            >
-              Preview
-            </button>
-            {/* Delete Button */}
-            <button
-              onClick={() => handleDeleteDocument(doc._id)}
-              className='bg-red-600 text-white px-4 py-2 rounded-md text-sm'
-            >
-              Delete
-            </button>
-          </div>
-        </div>
-      ))
-    ) : (
-      <p className='text-gray-400'>No documents uploaded.</p>
-    )}
-  </div>
-</div>
-
+                <p className='text-lg font-semibold'>DOCUMENTS</p>
+                <div className='w-full flex flex-col gap-4'>
+                  {task?.documents?.length > 0 ? (
+                    task.documents.map((doc, idx) => (
+                      <div
+                        key={idx}
+                        className='p-4 border rounded-md hover:bg-gray-100 transition-all flex items-center justify-between'
+                      >
+                        <div>
+                          <span className='text-blue-600 font-medium'>Document {idx + 1}</span>
+                          <div className='text-sm text-gray-500'>{doc.name}</div>
+                        </div>
+                        <div className='flex items-center space-x-2'>
+                          <button
+                            onClick={() => handlePreviewClick(doc)}
+                            className='bg-blue-600 text-white px-4 py-2 rounded-md text-sm'
+                          >
+                            Preview
+                          </button>
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleDeleteDocument(doc._id)}
+                            className='bg-red-600 text-white px-4 py-2 rounded-md text-sm'
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className='text-gray-400'>No documents uploaded.</p>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <Activities id={id} refetch={refetch} />
@@ -544,19 +558,27 @@ const TaskDetails = () => {
             <button
               onClick={handleClosePreview}
               className='absolute top-2 right-2 text-red-500 text-lg'
-            >×</button>
+            >
+              ×
+            </button>
             <h2 className='text-lg font-semibold mb-4'>Document Preview</h2>
             <div className='max-h-[70vh] overflow-auto'>
               {previewDoc.path.match(/\.(jpeg|jpg|png|gif)$/) ? (
                 <img src={previewDoc.path} alt={previewDoc.name} className='w-full object-contain' />
               ) : previewDoc.path.endsWith('.pdf') ? (
-                <object data={previewDoc.path} type='application/pdf' width='100%' height='600px'>PDF Preview</object>
+                <object data={previewDoc.path} type='application/pdf' width='100%' height='600px'>
+                  PDF Preview
+                </object>
               ) : (
                 <iframe
                   src={`https://docs.google.com/gview?url=${encodeURIComponent(previewDoc.path)}&embedded=true`}
-                  width='100%' height='600px' frameBorder='0'
+                  width='100%'
+                  height='600px'
+                  frameBorder='0'
                 >
-                  <p>Cannot preview this file. <a href={previewDoc.path}>Download</a></p>
+                  <p>
+                    Cannot preview this file. <a href={previewDoc.path}>Download</a>
+                  </p>
                 </iframe>
               )}
             </div>
@@ -566,7 +588,5 @@ const TaskDetails = () => {
     </>
   );
 };
-
-
 
 export default TaskDetails;

@@ -145,7 +145,7 @@ const Users = () => {
     <>
       <div className='w-full md:px-1 px-0 mb-6'>
         <div className='flex items-center justify-between mb-8'>
-          <Title title='Team Members' />
+          <Title title='Users' />
           <Button
             label='Add New User'
             icon={<IoMdAdd className='text-lg' />}
