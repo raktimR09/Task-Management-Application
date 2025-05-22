@@ -123,7 +123,7 @@ taskSchema.virtual("subTasksWithPriority").get(function () {
 
     // effective stage (computed only)
     let effectiveStage = sub.stage;
-    if (sub.stage !== "completed" && deadline < now) {
+    if (sub.stage !== "completed" && deadline <= now) {
       effectiveStage = "overdue";
     }
 
@@ -141,13 +141,13 @@ taskSchema.pre("save", function (next) {
   const now = new Date();
 
   // Update task stage to overdue if deadline has passed and not completed
-  if (this.stage !== "completed" && this.deadline < now) {
+  if (this.stage !== "completed" && this.deadline <= now) {
     this.stage = "overdue";
   }
 
   // Update each subtask's stage to overdue if deadline passed and not completed
   this.subTasks.forEach((sub) => {
-    if (sub.stage !== "completed" && sub.deadline < now) {
+    if (sub.stage !== "completed" && sub.deadline <= now) {
       sub.stage = "overdue";
     }
   });

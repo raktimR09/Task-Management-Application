@@ -302,7 +302,7 @@ export const createSubTask = async (req, res) => {
       return res.status(404).json({ status: false, message: "Task not found." });
     }
 
-    // ❌ Prevent adding subtask if task is locked (overdue)
+    // Prevent adding subtask if task is locked (overdue)
     if (task.isLocked) {
       return res.status(403).json({
         status: false,
@@ -310,7 +310,7 @@ export const createSubTask = async (req, res) => {
       });
     }
 
-    // ✅ Ensure valid members only (i.e., exist in parent task's team)
+    // Ensure valid members only (i.e., exist in parent task's team)
     const validMembers = (members || []).filter(member =>
       task.team.includes(member)
     );
@@ -324,6 +324,12 @@ export const createSubTask = async (req, res) => {
     };
 
     task.subTasks.push(newSubTask);
+
+    // If the task is completed, change stage to 'in progress' when adding a new subtask
+    if (task.stage?.toLowerCase() === "completed") {
+      task.stage = "in progress";
+    }
+
     await task.save();
 
     res.status(200).json({ status: true, message: "SubTask added successfully." });
@@ -332,6 +338,7 @@ export const createSubTask = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
 
 export const updateSubTask = async (req, res) => {
   const { id } = req.params;
@@ -565,6 +572,7 @@ export const uploadTaskDocument = async (req, res) => {
   }
 };
 
+
 export const deleteSubTask = async (req, res) => {
   try {
     const { taskId, subtaskId } = req.params;  // Getting the taskId and subtaskId from params
@@ -713,8 +721,14 @@ export const assignMissingUsersToHighPrioritySubtasks = async (req, res) => {
 
     // 2) Gather all user IDs assigned in any subtask
     const assignedSet = new Set();
+    const userSubtaskMap = {}; // { userId: [subtaskStages] }
     task.subTasks.forEach(sub => {
-      (sub.members || []).forEach(m => assignedSet.add(m.toString()));
+      (sub.members || []).forEach(m => {
+        const userId = m.toString();
+        assignedSet.add(userId);
+        if (!userSubtaskMap[userId]) userSubtaskMap[userId] = [];
+        userSubtaskMap[userId].push(sub.stage);
+      });
     });
 
     // 3) Find users in overdue subtasks
@@ -730,17 +744,25 @@ export const assignMissingUsersToHighPrioritySubtasks = async (req, res) => {
     const teamMemberIds = task.team.map(m => m.toString());
     const missingTeamMembers = teamMemberIds.filter(id => !assignedSet.has(id));
 
-    // 5) Combine missing team members and overdue users
-    const allToAssign = Array.from(new Set([...missingTeamMembers, ...overdueUsers]));
+    // 5) Determine free users (assigned only to completed subtasks)
+    const freeUsers = [];
+    for (const [userId, stages] of Object.entries(userSubtaskMap)) {
+      if (stages.every(stage => stage === 'completed')) {
+        freeUsers.push(userId);
+      }
+    }
+
+    // 6) Combine all assignable users: missing team members, overdue users, and free users
+    const allToAssign = Array.from(new Set([...missingTeamMembers, ...overdueUsers, ...freeUsers]));
 
     if (allToAssign.length === 0) {
       return res.status(200).json({
         status: true,
-        message: 'All relevant users are already assigned to subtasks.',
+        message: 'All relevant users are already assigned or unavailable.',
       });
     }
 
-    // 6) Get high-priority subtasks
+    // 7) Get high-priority subtasks
     const highPrioritySubs = task.subTasksWithPriority.filter(sub => sub.priority === 'high');
 
     if (highPrioritySubs.length === 0) {
@@ -750,7 +772,7 @@ export const assignMissingUsersToHighPrioritySubtasks = async (req, res) => {
       });
     }
 
-    // 7) Assign users to each high-priority subtask
+    // 8) Assign users to each high-priority subtask
     highPrioritySubs.forEach(updatedSub => {
       const originalSub = task.subTasks.id(updatedSub._id);
       const existing = new Set((originalSub.members || []).map(m => m.toString()));
@@ -761,16 +783,15 @@ export const assignMissingUsersToHighPrioritySubtasks = async (req, res) => {
         }
       });
 
-      // 💥 Correct usage: new mongoose.Types.ObjectId(id)
       originalSub.members = Array.from(existing).map(id => new mongoose.Types.ObjectId(id));
     });
 
-    // 8) Save
+    // 9) Save
     await task.save();
 
     return res.status(200).json({
       status: true,
-      message: 'Missing and overdue users have been assigned to high-priority subtasks.',
+      message: 'Free users have been assigned to high-priority subtasks.',
       updatedSubtaskIds: highPrioritySubs.map(s => s._id),
     });
 
@@ -779,6 +800,7 @@ export const assignMissingUsersToHighPrioritySubtasks = async (req, res) => {
     return res.status(500).json({ status: false, message: 'Server error.' });
   }
 };
+
 
 // Controller method to get the file preview
 export const getFilePreview = async (req, res) => {

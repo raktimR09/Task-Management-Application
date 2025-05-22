@@ -274,20 +274,33 @@ export const forgotPassword = async (req, res) => {
       return res.status(404).json({ status: false, message: "User not found" });
     }
 
-    // Generate token and expiry
-    const token = crypto.randomBytes(32).toString("hex");
-    user.resetToken = token;
-    user.resetTokenExpiry = Date.now() + 1000 * 60 * 10; // 10 minutes
-    await user.save();
+    // Generate token and hash it
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
 
-    const resetLink = `${process.env.CLIENT_URL}/reset-password/${token}`;
+    user.resetToken = hashedToken;
+    user.resetTokenExpiry = Date.now() + 1000 * 60 * 10; // 10 minutes
+
+    console.log("Raw Token:", rawToken);
+    console.log("Hashed Token to store:", hashedToken);
+
+    await user.save();
+    const savedUser = await User.findById(user._id);
+    console.log("Saved User Token:", savedUser.resetToken);
+
+    user.markModified("resetToken");
+
+
+    const resetLink = `${process.env.CLIENT_URL}/reset-password/${rawToken}`;
 
     const subject = "Password Reset Request";
     const html = `<p>Hello ${user.name},</p>
       <p>Click <a href="${resetLink}">here</a> to reset your password.</p>
       <p>This link will expire in 10 minutes.</p>`;
 
-    await sendEmail(user.email, subject, html);
+    const text = `Hello ${user.name},\n\nClick the link below to reset your password:\n${resetLink}\n\nThis link will expire in 10 minutes.`;
+    await sendEmail(user.email, subject, text);
+
 
     res.status(200).json({ status: true, message: "Password reset link sent to email." });
   } catch (error) {
@@ -297,19 +310,28 @@ export const forgotPassword = async (req, res) => {
 };
 
 export const resetPassword = async (req, res) => {
-  
   const { token, password } = req.body;
 
   if (!password) {
     return res.status(400).json({ status: false, message: "Password is required" });
   }
 
+  // Hash the token before searching
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  console.log("Hashed Token : ",hashedToken)
+
   const user = await User.findOne({
-    resetToken: token,
+    resetToken: hashedToken,
     resetTokenExpiry: { $gt: Date.now() },
   });
 
+  console.log("Incoming Token:", token);
+  console.log("Hashed Token to compare:", hashedToken);
+
+  console.log("User :",user);
+
   if (!user) {
+    console.log("User Invalid!");
     return res.status(400).json({ status: false, message: "Invalid or expired token" });
   }
 
@@ -321,6 +343,7 @@ export const resetPassword = async (req, res) => {
 
   res.status(200).json({ status: true, message: "Password reset successfully" });
 };
+
 
 
 

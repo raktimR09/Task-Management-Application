@@ -38,12 +38,12 @@ router.get("/dashboard", protectRoute, dashboardStatistics);
 router.get("/", protectRoute, getTasks);
 router.get("/:id", protectRoute, getTask);
 
-router.put("/create-subtask/:id", protectRoute, isAdminRoute, createSubTask);
+router.put("/create-subtask/:id", createSubTask);
 router.put("/update/:id", protectRoute, isAdminRoute, updateTask);
 router.put("/:id", protectRoute, isAdminRoute, trashTask);
 
 // ✅ New subtask update route
-router.put("/update-subtask/:id", protectRoute, isAdminRoute, updateSubTask);
+router.put("/update-subtask/:id", updateSubTask);
 
 router.delete("/delete-subtask/:taskId/:subtaskId", protectRoute, isAdminRoute, deleteSubTask);  // New delete route
 

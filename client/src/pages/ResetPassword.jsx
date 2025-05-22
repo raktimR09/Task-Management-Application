@@ -18,6 +18,11 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (data) => {
+    if (!token) {
+  toast.error("Reset token is missing from URL");
+  return;
+}
+
     try {
       setLoading(true);
       console.log("Sending to backend:", { token, password: data.password }); // DEBUG
@@ -26,7 +31,7 @@ const ResetPassword = () => {
         token,
         password: data.password,
       });
-
+      console.log("Response :",response);
       toast.success(response.data.message || "Password reset successful");
       navigate("/log-in");
     } catch (error) {

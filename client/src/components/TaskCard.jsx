@@ -35,6 +35,8 @@ const TaskCard = ({ task }) => {
   const priority = task?.priority?.toLowerCase();
   const isCompleted = task?.stage?.toLowerCase() === "completed";
   const isExpired = task?.stage?.toLowerCase() === "overdue";
+  const isDeadlinePassed = new Date(task.deadline) < new Date();
+
 
   const renderTaskStatus = () => {
     if (isCompleted) {
@@ -251,7 +253,7 @@ const TaskCard = ({ task }) => {
         <div className="w-full pb-2">
           <button
             onClick={() => setOpen(true)}
-            disabled={task?.isLocked || !user?.isAdmin || isCompleted || isExpired}
+            disabled={task?.isLocked || !user?.isAdmin || isExpired|| isDeadlinePassed}
             className="w-full flex gap-4 items-center text-sm text-gray-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
           >
             <IoMdAdd className="text-lg" />

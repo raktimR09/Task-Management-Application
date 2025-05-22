@@ -121,7 +121,7 @@ const Activities = ({ id, refetch }) => {
   const activity = selectedSubtaskObj?.activities || [];
 
   const handleSubmit = async () => {
-    if (!text || !selectedSubtask) return;
+    if (!selectedSubtask) return;
 
     const selected = subtasks.find((s) => s._id === selectedSubtask);
     if (!selected || selected.stage === "overdue" || selected.stage === "completed") {
@@ -434,76 +434,77 @@ const TaskDetails = () => {
 
                   <div className='space-y-8'>
                     {(task?.subTasksWithPriority || []).map((el, idx) => {
-                      // Compute expired state based on deadline date (fallback)
-                      const isExpired = isSubtaskExpired(el.deadline);
-                      // Debug log for each subtask status
-                      console.log(
-                        `Subtask: ${el.title}, Deadline: ${el.deadline}, Expired: ${isExpired}, Priority: ${el.priority}`
-                      );
+  const isExpired = isSubtaskExpired(el.deadline);
+  const isCompleted = el.stage === 'completed';
 
-                      return (
-                        <div key={idx} className='flex gap-3 items-start'>
-                          {/* Subtask Icon */}
-                          <div className='w-10 h-10 flex items-center justify-center rounded-full bg-violet-100'>
-                            <MdTaskAlt className='text-violet-600' size={26} />
-                          </div>
+  console.log(
+    `Subtask: ${el.title}, Deadline: ${el.deadline}, Expired: ${isExpired}, Priority: ${el.priority}, Stage: ${el.stage}`
+  );
 
-                          {/* Subtask Info */}
-                          <div className='space-y-2 w-full'>
-                            {/* Subtask Title */}
-                            <p className='text-gray-700 font-medium'>{el.title}</p>
+  return (
+    <div key={idx} className='flex gap-3 items-start'>
+      {/* Subtask Icon */}
+      <div className='w-10 h-10 flex items-center justify-center rounded-full bg-violet-100'>
+        <MdTaskAlt className='text-violet-600' size={26} />
+      </div>
 
-                            {/* Assigned Members */}
-                            {el.members?.length > 0 ? (
-                              <div className='flex gap-2 mt-1 flex-wrap'>
-                                {el.members.map((u, i) => (
-                                  <span
-                                    key={i}
-                                    className='text-sm text-white bg-blue-500 px-2 py-1 rounded-full'
-                                  >
-                                    {u.name}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className='text-gray-400 text-xs italic mt-1'>
-                                No members assigned
-                              </p>
-                            )}
+      {/* Subtask Info */}
+      <div className='space-y-2 w-full'>
+        {/* Subtask Title */}
+        <p className='text-gray-700 font-medium'>{el.title}</p>
 
-                            {/* If expired */}
-                            {isExpired && (
-                              <div className='bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col'>
-                                <p className='text-red-800 text-sm font-semibold'>
-                                  ❌ Subtask Expired
-                                </p>
-                              </div>
-                            )}
+        {/* Assigned Members */}
+        {el.members?.length > 0 ? (
+          <div className='flex gap-2 mt-1 flex-wrap'>
+            {el.members.map((u, i) => (
+              <span
+                key={i}
+                className='text-sm text-white bg-blue-500 px-2 py-1 rounded-full'
+              >
+                {u.name}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className='text-gray-400 text-xs italic mt-1'>
+            No members assigned
+          </p>
+        )}
 
-                            {/* If High Priority and NOT expired */}
-                            {!isExpired && el.priority === 'high' && (
-                              <div className='bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2'>
-                                <p className='text-yellow-800 text-sm'>
-                                  ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
-                                </p>
-                                <button
-                                  onClick={() => handleAssignMissingUsers(task._id, el._id, el.priority)}
-                                  className='bg-blue-600 text-white px-3 py-1 rounded-md w-max hover:bg-blue-700 transition'
-                                >
-                                  Assign Free Users
-                                </button>
-                                <button
-                                  onClick={() => handleAutoAssignUsersClick(task._id, el._id, el.priority)}
-                                  className='bg-yellow-600 text-white px-3 py-1 rounded-md w-max hover:bg-yellow-700 transition'
-                                >
-                                  Add Users from Other Tasks
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+        {/* Subtask Expired Warning (only if NOT completed) */}
+        {!isCompleted && isExpired && (
+          <div className='bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col'>
+            <p className='text-red-800 text-sm font-semibold'>
+              ❌ Subtask Expired
+            </p>
+          </div>
+        )}
+
+        {/* Assign Users Section (only if NOT completed and NOT expired and High Priority) */}
+        {!isCompleted && !isExpired && el.priority === 'high' && (
+          <div className='bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2'>
+            <p className='text-yellow-800 text-sm'>
+              ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
+            </p>
+            <button
+              onClick={() => handleAssignMissingUsers(task._id, el._id, el.priority)}
+              className='bg-blue-600 text-white px-3 py-1 rounded-md w-max hover:bg-blue-700 transition'
+            >
+              Assign Free Users
+            </button>
+            <button
+              onClick={() => handleAutoAssignUsersClick(task._id, el._id, el.priority)}
+              className='bg-yellow-600 text-white px-3 py-1 rounded-md w-max hover:bg-yellow-700 transition'
+            >
+              Add Users from Other Tasks
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+})}
+
                   </div>
                 </div>
               </div>

@@ -58,47 +58,45 @@ const TaskDialog = ({ task }) => {
     }
   };
 
-  // Build menu items
-  const items = [
-    {
-      label: "Open Task",
-      icon: <AiTwotoneFolderOpen className="mr-2 h-5 w-5" aria-hidden="true" />,
-      onClick: () => navigate(`/task/${task._id}`),
-    },
-    {
-      label: "Delete",
-      icon: <RiDeleteBin6Line className="mr-2 h-5 w-5" aria-hidden="true" />,
-      onClick: () => deleteClicks(),
-    },
-  ];
+// Build menu items
+const items = [
+  {
+    label: "Open Task",
+    icon: <AiTwotoneFolderOpen className="mr-2 h-5 w-5" aria-hidden="true" />,
+    onClick: () => navigate(`/task/${task._id}`),
+  },
+  {
+    label: "Delete",
+    icon: <RiDeleteBin6Line className="mr-2 h-5 w-5" aria-hidden="true" />,
+    onClick: () => deleteClicks(),
+  },
+];
 
-  if (!task?.isLocked) {
-    // Normal task: show Edit, Add Sub-Task, Duplicate
-    items.push(
-      {
-        label: "Edit",
-        icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
-        onClick: () => setOpenEdit(true),
-      },
-      {
-        label: "Add Sub-Task",
-        icon: <MdAdd className="mr-2 h-5 w-5" aria-hidden="true" />,
-        onClick: () => setOpen(true),
-      },
-      {
-        label: "Duplicate",
-        icon: <HiDuplicate className="mr-2 h-5 w-5" aria-hidden="true" />,
-        onClick: () => duplicateHandler(),
-      }
-    );
-  } else {
-    // Overdue (locked) task: replace Edit with Extend Task, disable Add Subtask and Duplicate
-    items.push({
-      label: "Extend Task",
+if (!task?.isLocked) {
+  // Normal task: show Edit, Duplicate (Removed Add Sub-Task)
+  items.push(
+    {
+      label: "Edit",
       icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
       onClick: () => setOpenEdit(true),
-    });
-  }
+    },
+    {
+      label: "Duplicate",
+      icon: <HiDuplicate className="mr-2 h-5 w-5" aria-hidden="true" />,
+      onClick: () => duplicateHandler(),
+    }
+  );
+} else {
+  // Overdue (locked) task: replace Edit with Extend Task, disable Add Subtask and Duplicate
+  items.push({
+    label: "Extend Task",
+    icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
+    onClick: () => setOpenEdit(true),
+  });
+}
+
+
+  
 
   return (
     <>
@@ -147,7 +145,6 @@ const TaskDialog = ({ task }) => {
         key={new Date().getTime()}
       />
 
-      <AddSubTask open={open} setOpen={setOpen} />
 
       <ConfirmatioDialog
         open={openDialog}
