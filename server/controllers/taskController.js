@@ -101,7 +101,6 @@ export const postTaskActivity = async (req, res) => {
       return res.status(400).json({ status: false, message: "Subtask ID is required" });
     }
 
-    // Fetch the task and locate the subtask
     const task = await Task.findById(id);
     if (!task) {
       return res.status(404).json({ status: false, message: "Task not found" });
@@ -112,9 +111,20 @@ export const postTaskActivity = async (req, res) => {
       return res.status(404).json({ status: false, message: "Subtask not found" });
     }
 
+    const isUserAssigned = subtask.members?.some(
+  (memberId) => memberId.toString() === userId
+);
+
+if (!isUserAssigned) {
+  return res.status(403).json({
+    status: false,
+    message: "You are not authorized to post activity for this subtask",
+  });
+}
+
+
     const now = new Date();
 
-    // Construct and push the new activity into the subtask
     const activityData = {
       type,
       activity,
@@ -123,34 +133,36 @@ export const postTaskActivity = async (req, res) => {
     };
     subtask.activities.push(activityData);
 
-    // Update subtask stage based on activity type
+    // Update subtask stage
     if (type.toLowerCase() === "completed") {
       subtask.stage = "completed";
     } else if (subtask.stage === "todo") {
       subtask.stage = "in progress";
     }
 
-    // Mark subtask as overdue if deadline passed and not completed
     if (subtask.stage !== "completed" && subtask.deadline < now) {
       subtask.stage = "overdue";
     }
 
-    // Update task stage based on subtask stages
-    if (task.subTasks.every(st => st.stage === "completed")) {
+    // Update task stage based on all subtasks
+    if (task.subTasks.every((st) => st.stage === "completed")) {
       task.stage = "completed";
     } else if (task.stage === "todo") {
       task.stage = "in progress";
     }
 
-    // Save the whole task document (subtask is embedded)
     await task.save();
 
-    return res.status(200).json({ status: true, message: "Subtask activity posted successfully." });
+    return res.status(200).json({
+      status: true,
+      message: "Subtask activity posted successfully.",
+    });
   } catch (error) {
     console.error(error);
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
 
 
 export const dashboardStatistics = async (req, res) => {
@@ -310,6 +322,17 @@ export const createSubTask = async (req, res) => {
       });
     }
 
+    const subtaskDeadline = new Date(deadline);
+    const taskDeadline = new Date(task.deadline);
+
+    // Validate subtask deadline
+    if (subtaskDeadline > taskDeadline) {
+      return res.status(400).json({
+        status: false,
+        message: "Subtask deadline cannot be later than task deadline.",
+      });
+    }
+
     // Ensure valid members only (i.e., exist in parent task's team)
     const validMembers = (members || []).filter(member =>
       task.team.includes(member)
@@ -318,7 +341,7 @@ export const createSubTask = async (req, res) => {
     const newSubTask = {
       title,
       tag,
-      deadline: new Date(deadline),
+      deadline: subtaskDeadline,
       members: validMembers,
       priority: priority?.toLowerCase() ?? "low",
     };
@@ -339,7 +362,6 @@ export const createSubTask = async (req, res) => {
   }
 };
 
-
 export const updateSubTask = async (req, res) => {
   const { id } = req.params;
   const { title, deadline, priority, tag, members, previousStage } = req.body;
@@ -348,6 +370,18 @@ export const updateSubTask = async (req, res) => {
     const task = await Task.findOne({ "subTasks._id": id });
     if (!task) {
       return res.status(404).json({ message: "Subtask not found (parent task missing)" });
+    }
+
+    // Validate subtask deadline against parent task deadline
+    if (deadline && task.deadline) {
+      const subtaskDeadline = new Date(deadline);
+      const parentDeadline = new Date(task.deadline);
+
+      if (subtaskDeadline > parentDeadline) {
+        return res.status(400).json({
+          message: "Subtask deadline cannot be later than task deadline.",
+        });
+      }
     }
 
     if (task.isLocked) {
@@ -374,7 +408,7 @@ export const updateSubTask = async (req, res) => {
 
     // Update fields only if they exist in request
     if (title) subtask.title = title;
-    if (deadline) subtask.deadline = deadline; // update after checking old deadline
+    if (deadline) subtask.deadline = deadline;
     if (priority) subtask.priority = priority;
     if (tag) subtask.tag = tag;
 
@@ -385,7 +419,6 @@ export const updateSubTask = async (req, res) => {
 
     // Restore stage from overdue only if valid and deadline extended or is now future
     if (wasExpired && isNowFuture && previousStage && previousStage !== "overdue") {
-      // Use your existing logic to set stage based on activity
       if (subtask.activities && subtask.activities.length > 0) {
         subtask.stage = "in progress";
       } else {
@@ -412,9 +445,6 @@ export const updateSubTask = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
-
 
 export const updateTask = async (req, res) => {
   try {
@@ -444,7 +474,7 @@ export const updateTask = async (req, res) => {
             // If new deadline is in future, revert overdue status
             task.stage = "in progress"; // or whatever stage fits your workflow
           }
-        } 
+        }
         await task.save();
         return res.status(200).json({ status: true, message: "Deadline extended successfully." });
       } else {
@@ -458,7 +488,13 @@ export const updateTask = async (req, res) => {
     // If not locked, allow full update
     if (title) task.title = title;
     if (date) task.deadline = new Date(date);
-    if (team) task.team = team;
+
+    if (team) {
+      // Remove duplicates from the incoming team array
+      const uniqueTeam = Array.from(new Set(team));
+      task.team = uniqueTeam;
+    }
+
     if (assets) task.assets = assets;
 
     // Handle overdue logic for stage
@@ -479,7 +515,6 @@ export const updateTask = async (req, res) => {
     return res.status(400).json({ status: false, message: error.message });
   }
 };
-
 
 
 export const trashTask = async (req, res) => {
@@ -593,6 +628,16 @@ export const deleteSubTask = async (req, res) => {
     // Remove the subtask from the array
     task.subTasks.splice(subtaskIndex, 1);
 
+    // Check if all remaining subtasks are completed
+    const allCompleted = task.subTasks.length > 0 && task.subTasks.every(
+      (st) => st.stage?.toLowerCase() === "completed"
+    );
+
+    // If all subtasks completed, mark task as completed
+    if (allCompleted) {
+      task.stage = "completed";
+    }
+
     // Save the updated task
     await task.save();
 
@@ -602,6 +647,7 @@ export const deleteSubTask = async (req, res) => {
     return res.status(500).json({ status: false, message: "Server error, could not delete subtask" });
   }
 };
+
 
 export const getTaskDocument = async (req, res) => {
   try {

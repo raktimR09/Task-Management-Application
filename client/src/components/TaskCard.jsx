@@ -12,7 +12,7 @@ import TaskDialog from "./task/TaskDialog";
 import { BiMessageAltDetail } from "react-icons/bi";
 import { FaList, FaEdit, FaTrashAlt } from "react-icons/fa";
 import UserInfo from "./UserInfo";
-import { IoMdAdd } from "react-icons/io";
+import { IoMdAdd, IoMdPeople } from "react-icons/io";
 import AddSubTask from "./task/AddSubTask";
 import EditSubTask from "./task/EditSubTask";
 import { useDeleteSubTaskMutation } from "../redux/slices/api/taskApiSlice";
@@ -37,6 +37,17 @@ const TaskCard = ({ task }) => {
   const isExpired = task?.stage?.toLowerCase() === "overdue";
   const isDeadlinePassed = new Date(task.deadline) < new Date();
 
+  const completedSubtasksCount = task?.subTasks?.filter(
+  (st) => st.stage === "completed"
+).length ?? 0;
+
+  const sortSubTasksByTimeLeft = (subTasks) => {
+    return [...subTasks].sort((a, b) => {
+      const timeLeftA = new Date(a.deadline) - new Date();
+      const timeLeftB = new Date(b.deadline) - new Date();
+      return timeLeftA - timeLeftB;
+    });
+  };
 
   const renderTaskStatus = () => {
     if (isCompleted) {
@@ -99,7 +110,7 @@ const TaskCard = ({ task }) => {
 
   const handleExtend = (subtask) => {
     setSelectedSubTask(subtask);
-    setPreviousStage(subtask.stage); // Save current stage before expiration
+    setPreviousStage(subtask.stage);
     setEditOpen(true);
   };
 
@@ -146,16 +157,16 @@ const TaskCard = ({ task }) => {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <div className="flex gap-1 items-center text-sm text-gray-600">
-              <BiMessageAltDetail />
-              <span>{task?.activities?.length ?? 0}</span>
-            </div>
-            <div className="flex gap-1 items-center text-sm text-gray-600">
               <MdAttachFile />
-              <span>{task?.assets?.length ?? 0}</span>
+              <span>{task?.documents?.length ?? 0}</span>
             </div>
             <div className="flex gap-1 items-center text-sm text-gray-600">
               <FaList />
-              <span>0/{task?.subTasks?.length ?? 0}</span>
+              <span>{completedSubtasksCount}/{task?.subTasks?.length ?? 0}</span>
+            </div>
+            <div className="flex gap-1 items-center text-sm text-gray-600">
+              <IoMdPeople />
+              <span>{task?.team?.length ?? 0}</span>
             </div>
           </div>
 
@@ -177,7 +188,7 @@ const TaskCard = ({ task }) => {
         {/* Subtasks */}
         <div className="py-4 border-t border-gray-200">
           {task?.subTasksWithPriority?.length > 0 ? (
-            task.subTasksWithPriority.map((sub, index) => {
+            sortSubTasksByTimeLeft(task.subTasksWithPriority).map((sub, index) => {
               const isSubCompleted = sub?.stage?.toLowerCase() === "completed";
               const isSubExpired =
                 !isSubCompleted && new Date(sub.deadline) < new Date();
@@ -253,7 +264,7 @@ const TaskCard = ({ task }) => {
         <div className="w-full pb-2">
           <button
             onClick={() => setOpen(true)}
-            disabled={task?.isLocked || !user?.isAdmin || isExpired|| isDeadlinePassed}
+            disabled={task?.isLocked || !user?.isAdmin || isExpired || isDeadlinePassed}
             className="w-full flex gap-4 items-center text-sm text-gray-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
           >
             <IoMdAdd className="text-lg" />
@@ -276,7 +287,7 @@ const TaskCard = ({ task }) => {
           subTask={selectedSubTask}
           team={task.team}
           onSave={handleEditSubTask}
-          previousStage={previousStage} // ✅ Pass previous stage
+          previousStage={previousStage}
         />
       )}
     </>

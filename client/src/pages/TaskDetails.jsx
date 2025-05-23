@@ -95,6 +95,8 @@ const act_types = [
   "Assigned",
 ];
 
+
+
 const Activities = ({ id, refetch }) => {
   const { user } = useSelector((state) => state.auth);
   const [selectedType, setSelectedType] = useState(act_types[0]);
@@ -105,6 +107,24 @@ const Activities = ({ id, refetch }) => {
   const { data } = useGetSingleTaskQuery({ id });
 
   const subtasks = data?.task?.subTasks || [];
+
+  // Sort subtasks by deadline (earliest first)
+  const sortedSubtasks = [...subtasks].sort(
+    (a, b) => new Date(a.deadline) - new Date(b.deadline)
+  );
+
+  // Group activities by sorted subtasks
+  const allActivitiesBySubtask = sortedSubtasks.map((st) => ({
+    subtaskTitle: st.title,
+    activities: st.activities || [],
+    deadline: st.deadline,
+    _id: st._id,
+    stage: st.stage,
+  }));
+
+  const selectedSubtaskObj = subtasks.find((s) => s._id === selectedSubtask);
+  const activity = selectedSubtaskObj?.activities || [];
+
   const isAssignedUser = data?.task?.team?.some((m) => m?._id === user?._id);
   const isAdmin = user?.isAdmin === true;
 
@@ -112,39 +132,35 @@ const Activities = ({ id, refetch }) => {
   const canAddActivity =
     isAssignedUser && taskStage !== "overdue" && taskStage !== "completed";
 
-  const allActivitiesBySubtask = subtasks.map((st) => ({
-    subtaskTitle: st.title,
-    activities: st.activities || [],
-  }));
-
-  const selectedSubtaskObj = subtasks.find((s) => s._id === selectedSubtask);
-  const activity = selectedSubtaskObj?.activities || [];
-
   const handleSubmit = async () => {
-    if (!selectedSubtask) return;
+  if (!selectedSubtask) return;
 
-    const selected = subtasks.find((s) => s._id === selectedSubtask);
-    if (!selected || selected.stage === "overdue" || selected.stage === "completed") {
-      toast.error("Cannot add activity to overdue or completed subtask.");
-      return;
-    }
+  const selected = subtasks.find((s) => s._id === selectedSubtask);
 
-    try {
-      const activityData = {
-        type: selectedType.toLowerCase(),
-        activity: text,
-        subtaskId: selectedSubtask,
-      };
-      const result = await postActivity({ data: activityData, id }).unwrap();
-      toast.success(result?.message);
-      setText("");
-      setSelectedSubtask("");
-      refetch();
-    } catch (error) {
-      console.error(error);
-      toast.error("Something went wrong!");
-    }
-  };
+  if (!selected || selected.stage === "overdue" || selected.stage === "completed") {
+    toast.error("Cannot add activity to overdue or completed subtask.");
+    return;
+  }
+
+  try {
+    const activityData = {
+      type: selectedType.toLowerCase(),
+      activity: text,
+      subtaskId: selectedSubtask,
+    };
+    const result = await postActivity({ data: activityData, id }).unwrap();
+    toast.success(result?.message);
+    setText("");
+    setSelectedSubtask("");
+    refetch();
+  } catch (error) {
+    console.error(error);
+    const message =
+    error?.response?.data?.message || "Something went wrong!";
+  toast.error(message);
+  }
+};
+
 
   const Card = ({ item }) => (
     <div className="flex space-x-4">
@@ -176,16 +192,20 @@ const Activities = ({ id, refetch }) => {
         <h4 className="text-gray-600 font-semibold text-lg mb-5">Subtask Activities</h4>
 
         {isAdmin ? (
-          allActivitiesBySubtask.map(({ subtaskTitle, activities }) => (
-            <div key={subtaskTitle} className="mb-8">
-              <h5 className="font-medium text-gray-700 mb-3">{subtaskTitle}</h5>
-              {activities.length > 0 ? (
-                activities.map((act, idx) => <Card key={idx} item={act} />)
-              ) : (
-                <p className="text-gray-400 italic">No activity for this subtask.</p>
-              )}
-            </div>
-          ))
+          allActivitiesBySubtask.length > 0 ? (
+            allActivitiesBySubtask.map(({ subtaskTitle, activities, _id }) => (
+              <div key={_id} className="mb-8">
+                <h5 className="font-medium text-gray-700 mb-3">{subtaskTitle}</h5>
+                {activities.length > 0 ? (
+                  activities.map((act, idx) => <Card key={idx} item={act} />)
+                ) : (
+                  <p className="text-gray-400 italic">No activity for this subtask.</p>
+                )}
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-400 italic">No subtasks or activities available.</p>
+          )
         ) : (
           <>
             {!selectedSubtask ? (
@@ -214,7 +234,7 @@ const Activities = ({ id, refetch }) => {
               onChange={(e) => setSelectedSubtask(e.target.value)}
             >
               <option value="">-- Select a subtask --</option>
-              {subtasks.map((st) => (
+              {sortedSubtasks.map((st) => (
                 <option
                   key={st._id}
                   value={st._id}
@@ -274,6 +294,8 @@ const Activities = ({ id, refetch }) => {
 };
 
 
+
+
 const TaskDetails = () => {
   const { id } = useParams();
   const { user } = useSelector((state) => state.auth);
@@ -294,23 +316,16 @@ const TaskDetails = () => {
   // Helper: Check if subtask deadline is expired based on current date
   const isSubtaskExpired = (deadline) => {
     if (!deadline) return false; // No deadline means not expired
-    return moment(deadline).isBefore(moment(), 'day'); // expired if deadline is before today
+    return moment(deadline).isBefore(moment(), "day"); // expired if deadline is before today
   };
 
   const handleAutoAssignUsersClick = async (taskId, subtaskId, priority) => {
-    console.log("Task ID:", taskId);
-    console.log("Subtask ID:", subtaskId);
-    console.log("Priority:", priority);
-
     try {
       const res = await autoAssignUsers({ taskId, subtaskId }).unwrap();
-      console.log("Auto-assign success:", res);
-      toast.success('Users added to high priority subtask!');
+      toast.success("Users added to high priority subtask!");
       refetch();
     } catch (error) {
-      console.error("Auto-assign failed. Error object:", error);
       if (error?.data) {
-        console.error("Error response from server:", error.data);
         toast.error(error.data.message || "Server error while auto-assigning users.");
       } else {
         toast.error("Unexpected error while auto-assigning users.");
@@ -320,26 +335,22 @@ const TaskDetails = () => {
 
   const handleAssignMissingUsers = async (taskId, subtaskId, priority) => {
     try {
-      console.log("Task ID:", taskId);
-      console.log("Subtask ID:", subtaskId);
-      console.log("Priority:", priority);
       const res = await assignMissingUsers({ taskId, subtaskId }).unwrap();
-      toast.success('Free users successfully assigned!');
+      toast.success("Free users successfully assigned!");
       refetch();
     } catch (error) {
-      toast.error('Error while assigning missing users.');
-      console.error(error);
+      toast.error("Error while assigning missing users.");
     }
   };
 
   const handlePreviewClick = (doc) => {
     if (doc.path) {
-      const normalizedPath = doc.path.replace(/\\/g, '/');
-      const fileName = normalizedPath.split('/').pop();
+      const normalizedPath = doc.path.replace(/\\/g, "/");
+      const fileName = normalizedPath.split("/").pop();
       const backendURL = `http://localhost:8800/uploads/${fileName}`;
       setPreviewDoc({ ...doc, path: backendURL });
     } else {
-      console.warn('Document path is missing or invalid:', doc);
+      console.warn("Document path is missing or invalid:", doc);
     }
   };
 
@@ -351,14 +362,13 @@ const TaskDetails = () => {
       toast.success(response.message);
       refetch();
     } catch (error) {
-      console.error(error);
-      toast.error('Failed to delete document');
+      toast.error("Failed to delete document");
     }
   };
 
   if (isLoading) {
     return (
-      <div className='py-10'>
+      <div className="py-10">
         <Loading />
       </div>
     );
@@ -366,16 +376,16 @@ const TaskDetails = () => {
 
   return (
     <>
-      <div className='w-full flex flex-col gap-3 mb-4 overflow-y-hidden'>
-        <h1 className='text-2xl text-gray-600 font-bold'>{task?.title}</h1>
+      <div className="w-full flex flex-col gap-3 mb-4 overflow-y-hidden">
+        <h1 className="text-2xl text-gray-600 font-bold">{task?.title}</h1>
 
         <Tabs tabs={TABS} setSelected={setSelected}>
           {selected === 0 ? (
-            <div className='w-full flex flex-col md:flex-row gap-5 2xl:gap-8 bg-white shadow-md p-8 overflow-y-auto'>
+            <div className="w-full flex flex-col md:flex-row gap-5 2xl:gap-8 bg-white shadow-md p-8 overflow-y-auto">
               {/* LEFT */}
-              <div className='w-full md:w-1/2 space-y-8'>
+              <div className="w-full md:w-1/2 space-y-8">
                 {/* Priority and Stage */}
-                <div className='flex items-center gap-5'>
+                <div className="flex items-center gap-5">
                   {!["overdue", "completed"].includes(task?.stage?.toLowerCase()) && (
                     <div
                       className={clsx(
@@ -384,44 +394,41 @@ const TaskDetails = () => {
                         bgColor[task?.priority]
                       )}
                     >
-                      <span className='text-lg'>{ICONS[task?.priority]}</span>
-                      <span className='uppercase'>{task?.priority} Priority</span>
+                      <span className="text-lg">{ICONS[task?.priority]}</span>
+                      <span className="uppercase">{task?.priority} Priority</span>
                     </div>
                   )}
 
-                  <div className='flex items-center gap-2'>
+                  <div className="flex items-center gap-2">
                     <div className={clsx("w-4 h-4 rounded-full", TASK_TYPE[task?.stage])} />
-                    <span className='text-black uppercase'>{task?.stage}</span>
+                    <span className="text-black uppercase">{task?.stage}</span>
                   </div>
                 </div>
 
-                <p className='text-gray-500'>
+                <p className="text-gray-500">
                   Created At: {moment(task?.createdAt).format("MMMM Do YYYY, h:mm a")}
                 </p>
 
                 {/* Asset/SubTask count */}
-                <div className='flex items-center gap-8 p-4 border-y border-gray-200'>
-                  <div className='space-x-2'>
-                    <span className='font-semibold'>Sub-Task :</span>
+                <div className="flex items-center gap-8 p-4 border-y border-gray-200">
+                  <div className="space-x-2">
+                    <span className="font-semibold">Sub-Task :</span>
                     <span>{task?.subTasks?.length}</span>
                   </div>
                 </div>
 
                 {/* Task Team */}
-                <div className='space-y-4 py-6'>
-                  <p className='text-gray-600 font-semibold text-sm'>TASK TEAM</p>
-                  <div className='space-y-3'>
+                <div className="space-y-4 py-6">
+                  <p className="text-gray-600 font-semibold text-sm">TASK TEAM</p>
+                  <div className="space-y-3">
                     {task?.team?.map((m, index) => (
-                      <div
-                        key={index}
-                        className='flex gap-4 py-2 items-center border-t border-gray-200'
-                      >
-                        <div className='w-10 h-10 rounded-full text-white flex items-center justify-center text-sm -mr-1 bg-blue-600'>
-                          <span className='text-center'>{getInitials(m?.name)}</span>
+                      <div key={index} className="flex gap-4 py-2 items-center border-t border-gray-200">
+                        <div className="w-10 h-10 rounded-full text-white flex items-center justify-center text-sm -mr-1 bg-blue-600">
+                          <span className="text-center">{getInitials(m?.name)}</span>
                         </div>
                         <div>
-                          <p className='text-lg font-semibold'>{m?.name}</p>
-                          <span className='text-gray-500'>{m?.title}</span>
+                          <p className="text-lg font-semibold">{m?.name}</p>
+                          <span className="text-gray-500">{m?.title}</span>
                         </div>
                       </div>
                     ))}
@@ -429,111 +436,105 @@ const TaskDetails = () => {
                 </div>
 
                 {/* Sub-Tasks */}
-                <div className='space-y-4 py-6'>
-                  <p className='text-gray-500 font-semibold text-sm'>SUB-TASKS</p>
+                <div className="space-y-4 py-6">
+                  <p className="text-gray-500 font-semibold text-sm">SUB-TASKS</p>
 
-                  <div className='space-y-8'>
-                    {(task?.subTasksWithPriority || []).map((el, idx) => {
-  const isExpired = isSubtaskExpired(el.deadline);
-  const isCompleted = el.stage === 'completed';
+                  <div className="space-y-8">
+                    {(task?.subTasksWithPriority || [])
+                      .slice()
+                      .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+                      .map((el, idx) => {
+                        const isExpired = isSubtaskExpired(el.deadline);
+                        const isCompleted = el.stage === "completed";
 
-  console.log(
-    `Subtask: ${el.title}, Deadline: ${el.deadline}, Expired: ${isExpired}, Priority: ${el.priority}, Stage: ${el.stage}`
-  );
+                        return (
+                          <div key={idx} className="flex gap-3 items-start">
+                            {/* Subtask Icon */}
+                            <div className="w-10 h-10 flex items-center justify-center rounded-full bg-violet-100">
+                              <MdTaskAlt className="text-violet-600" size={26} />
+                            </div>
 
-  return (
-    <div key={idx} className='flex gap-3 items-start'>
-      {/* Subtask Icon */}
-      <div className='w-10 h-10 flex items-center justify-center rounded-full bg-violet-100'>
-        <MdTaskAlt className='text-violet-600' size={26} />
-      </div>
+                            {/* Subtask Info */}
+                            <div className="space-y-2 w-full">
+                              {/* Subtask Title */}
+                              <p className="text-gray-700 font-medium">{el.title}</p>
 
-      {/* Subtask Info */}
-      <div className='space-y-2 w-full'>
-        {/* Subtask Title */}
-        <p className='text-gray-700 font-medium'>{el.title}</p>
+                              {/* Assigned Members */}
+                              {el.members?.length > 0 ? (
+                                <div className="flex gap-2 mt-1 flex-wrap">
+                                  {el.members.map((u, i) => (
+                                    <span
+                                      key={i}
+                                      className="text-sm text-white bg-blue-500 px-2 py-1 rounded-full"
+                                    >
+                                      {u.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-gray-400 text-xs italic mt-1">No members assigned</p>
+                              )}
 
-        {/* Assigned Members */}
-        {el.members?.length > 0 ? (
-          <div className='flex gap-2 mt-1 flex-wrap'>
-            {el.members.map((u, i) => (
-              <span
-                key={i}
-                className='text-sm text-white bg-blue-500 px-2 py-1 rounded-full'
-              >
-                {u.name}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className='text-gray-400 text-xs italic mt-1'>
-            No members assigned
-          </p>
-        )}
+                              {/* Subtask Expired Warning (only if NOT completed) */}
+                              {!isCompleted && isExpired && (
+                                <div className="bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col">
+                                  <p className="text-red-800 text-sm font-semibold">❌ Subtask Expired</p>
+                                </div>
+                              )}
 
-        {/* Subtask Expired Warning (only if NOT completed) */}
-        {!isCompleted && isExpired && (
-          <div className='bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col'>
-            <p className='text-red-800 text-sm font-semibold'>
-              ❌ Subtask Expired
-            </p>
-          </div>
-        )}
-
-        {/* Assign Users Section (only if NOT completed and NOT expired and High Priority) */}
-        {!isCompleted && !isExpired && el.priority === 'high' && (
-          <div className='bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2'>
-            <p className='text-yellow-800 text-sm'>
-              ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
-            </p>
-            <button
-              onClick={() => handleAssignMissingUsers(task._id, el._id, el.priority)}
-              className='bg-blue-600 text-white px-3 py-1 rounded-md w-max hover:bg-blue-700 transition'
-            >
-              Assign Free Users
-            </button>
-            <button
-              onClick={() => handleAutoAssignUsersClick(task._id, el._id, el.priority)}
-              className='bg-yellow-600 text-white px-3 py-1 rounded-md w-max hover:bg-yellow-700 transition'
-            >
-              Add Users from Other Tasks
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-})}
-
+                              {/* Assign Users Section (only if NOT completed and NOT expired and High Priority) */}
+                              {!isCompleted && !isExpired && el.priority === "high" && (
+                                <div className="bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2">
+                                  <p className="text-yellow-800 text-sm">
+                                    ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
+                                  </p>
+                                  <button
+                                    onClick={() => handleAssignMissingUsers(task._id, el._id, el.priority)}
+                                    className="bg-blue-600 text-white px-3 py-1 rounded-md w-max hover:bg-blue-700 transition"
+                                  >
+                                    Assign Free Users
+                                  </button>
+                                  <button
+                                    onClick={() => handleAutoAssignUsersClick(task._id, el._id, el.priority)}
+                                    className="bg-yellow-600 text-white px-3 py-1 rounded-md w-max hover:bg-yellow-700 transition"
+                                  >
+                                    Add Users from Other Tasks
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
               </div>
 
               {/* RIGHT SIDE: Documents with Preview */}
-              <div className='w-full md:w-1/2 space-y-8'>
-                <p className='text-lg font-semibold'>DOCUMENTS</p>
-                <div className='w-full flex flex-col gap-4'>
+              <div className="w-full md:w-1/2 space-y-8">
+                <p className="text-lg font-semibold">DOCUMENTS</p>
+                <div className="w-full flex flex-col gap-4">
                   {task?.documents?.length > 0 ? (
                     task.documents.map((doc, idx) => (
                       <div
                         key={idx}
-                        className='p-4 border rounded-md hover:bg-gray-100 transition-all flex items-center justify-between'
+                        className="p-4 border rounded-md hover:bg-gray-100 transition-all flex items-center justify-between"
                       >
                         <div>
-                          <span className='text-blue-600 font-medium'>Document {idx + 1}</span>
-                          <div className='text-sm text-gray-500'>{doc.name}</div>
+                          <span className="text-blue-600 font-medium">Document {idx + 1}</span>
+                          <div className="text-sm text-gray-500">{doc.name}</div>
                         </div>
-                        <div className='flex items-center space-x-2'>
+                        <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handlePreviewClick(doc)}
-                            className='bg-blue-600 text-white px-4 py-2 rounded-md text-sm'
+                            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm"
                           >
                             Preview
                           </button>
                           {/* Delete Button */}
                           <button
                             onClick={() => handleDeleteDocument(doc._id)}
-                            className='bg-red-600 text-white px-4 py-2 rounded-md text-sm'
+                            className="bg-red-600 text-white px-4 py-2 rounded-md text-sm"
                           >
                             Delete
                           </button>
@@ -541,7 +542,7 @@ const TaskDetails = () => {
                       </div>
                     ))
                   ) : (
-                    <p className='text-gray-400'>No documents uploaded.</p>
+                    <p className="text-gray-400">No documents uploaded.</p>
                   )}
                 </div>
               </div>
@@ -554,28 +555,28 @@ const TaskDetails = () => {
 
       {/* Preview Modal */}
       {previewDoc && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50'>
-          <div className='bg-white p-4 rounded-md max-w-3xl w-full relative'>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-4 rounded-md max-w-3xl w-full relative">
             <button
               onClick={handleClosePreview}
-              className='absolute top-2 right-2 text-red-500 text-lg'
+              className="absolute top-2 right-2 text-red-500 text-lg"
             >
               ×
             </button>
-            <h2 className='text-lg font-semibold mb-4'>Document Preview</h2>
-            <div className='max-h-[70vh] overflow-auto'>
+            <h2 className="text-lg font-semibold mb-4">Document Preview</h2>
+            <div className="max-h-[70vh] overflow-auto">
               {previewDoc.path.match(/\.(jpeg|jpg|png|gif)$/) ? (
-                <img src={previewDoc.path} alt={previewDoc.name} className='w-full object-contain' />
-              ) : previewDoc.path.endsWith('.pdf') ? (
-                <object data={previewDoc.path} type='application/pdf' width='100%' height='600px'>
+                <img src={previewDoc.path} alt={previewDoc.name} className="w-full object-contain" />
+              ) : previewDoc.path.endsWith(".pdf") ? (
+                <object data={previewDoc.path} type="application/pdf" width="100%" height="600px">
                   PDF Preview
                 </object>
               ) : (
                 <iframe
                   src={`https://docs.google.com/gview?url=${encodeURIComponent(previewDoc.path)}&embedded=true`}
-                  width='100%'
-                  height='600px'
-                  frameBorder='0'
+                  width="100%"
+                  height="600"
+                  frameBorder="0"
                 >
                   <p>
                     Cannot preview this file. <a href={previewDoc.path}>Download</a>
@@ -589,5 +590,7 @@ const TaskDetails = () => {
     </>
   );
 };
+
+
 
 export default TaskDetails;

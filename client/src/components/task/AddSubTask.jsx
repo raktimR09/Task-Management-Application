@@ -7,7 +7,7 @@ import { useCreateSubTaskMutation } from "../../redux/slices/api/taskApiSlice";
 import { toast } from "sonner";
 import UserInfo from "../UserInfo";
 
-const AddSubTask = ({ open, setOpen, id, team = [] }) => {
+const AddSubTask = ({ open, setOpen, id, team = [], taskDeadline }) => {
   const {
     register,
     handleSubmit,
@@ -29,15 +29,26 @@ const AddSubTask = ({ open, setOpen, id, team = [] }) => {
       return;
     }
 
+    const subDeadline = new Date(data.deadline);
+    const parentDeadline = new Date(taskDeadline);
+
+    if (subDeadline > parentDeadline) {
+      toast.error("Subtask deadline cannot be later than task deadline.");
+      return;
+    }
+
     try {
       const res = await addSbTask({ data, id }).unwrap();
       toast.success("Subtask added successfully!");
       setTimeout(() => {
-        setOpen(false);
+        setOpen(false);             // Close modal
+        window.location.reload();   // Refresh page
       }, 500);
     } catch (error) {
       console.error("Error adding subtask:", error);
-      toast.error("Something went wrong while adding the subtask.");
+      toast.error(
+        error?.data?.message || "Something went wrong while adding the subtask."
+      );
     }
   };
 

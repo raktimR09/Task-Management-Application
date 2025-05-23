@@ -7,7 +7,7 @@ import { useUpdateSubTaskMutation } from "../../redux/slices/api/taskApiSlice";
 import { toast } from "sonner";
 import UserInfo from "../UserInfo";
 
-const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
+const EditSubTask = ({ open, setOpen, subTask, team = [], taskDeadline }) => {
   const {
     register,
     handleSubmit,
@@ -35,6 +35,10 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
   };
 
   const handleOnSubmit = async (data) => {
+    const subDeadline = new Date(data.deadline);
+    const parentDeadline = new Date(taskDeadline);
+
+
     const subtaskData = {
       title: data.title,
       deadline: data.deadline,
@@ -43,24 +47,23 @@ const EditSubTask = ({ open, setOpen, subTask, team = [] }) => {
       members: Array.isArray(data.members) ? data.members : [],
     };
 
-    console.log("Updating subtask:", subTask._id);
-    console.log("Payload:", subtaskData);
-    console.log("Subtask Stage:", subTask.stage);
+    if (subDeadline > parentDeadline) {
+      toast.error("Subtask deadline cannot be later than task deadline.");
+      return;
+    }
 
     try {
       const response = await updateSubTask({ id: subTask._id, data: subtaskData }).unwrap();
-      setTimeout(() => {
-        setOpen(false);               // Close the modal
-        window.location.reload();     // Refresh the page
-      }, 500);
-
       if (response) {
         toast.success("Subtask updated successfully!");
-        setTimeout(() => setOpen(false), 500);
+        setTimeout(() => {
+        setOpen(false);             // Close modal
+        window.location.reload();   // Refresh page
+      }, 500);
       }
     } catch (error) {
       console.error("Update failed:", error?.data || error?.message || error);
-      toast.error("Failed to update subtask.");
+      toast.error(error?.data?.message || "Something went wrong while updating the subtask.");
     }
   };
 

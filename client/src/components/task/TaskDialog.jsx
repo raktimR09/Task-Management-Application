@@ -3,20 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { AiTwotoneFolderOpen } from "react-icons/ai";
 import { BsThreeDots } from "react-icons/bs";
 import { HiDuplicate } from "react-icons/hi";
-import { MdAdd, MdOutlineEdit } from "react-icons/md";
+import { MdOutlineEdit } from "react-icons/md";
 import { RiDeleteBin6Line } from "react-icons/ri";
 import { Menu, Transition } from "@headlessui/react";
 import AddTask from "./AddTask";
-import AddSubTask from "./AddSubTask";
 import ConfirmatioDialog from "../Dialogs";
 import { useDuplicateTaskMutation, useTrashTaskMutation } from "../../redux/slices/api/taskApiSlice";
 import { toast } from "sonner";
 
 const TaskDialog = ({ task }) => {
-  const [open, setOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-
   const navigate = useNavigate();
 
   const [deleteTask] = useTrashTaskMutation();
@@ -27,27 +24,18 @@ const TaskDialog = ({ task }) => {
       const res = await duplicateTask(task._id).unwrap();
       toast.success(res?.message);
       setTimeout(() => {
-        setOpen(false);
         window.location.reload();
       }, 500);
     } catch (error) {
       console.log(error);
-      toast.error(error?.data?.message);
+      toast.error(error?.data?.message || "Duplicate failed");
     }
-  };
-
-  const deleteClicks = () => {
-    setOpenDialog(true);
   };
 
   const deleteHandler = async () => {
     try {
-      const res = await deleteTask({
-        id: task._id,
-        isTrashed: "trash",
-      }).unwrap();
+      const res = await deleteTask({ id: task._id, isTrashed: "trash" }).unwrap();
       toast.success(res?.message);
-
       setTimeout(() => {
         setOpenDialog(false);
         window.location.reload();
@@ -58,51 +46,55 @@ const TaskDialog = ({ task }) => {
     }
   };
 
-// Build menu items
-const items = [
-  {
-    label: "Open Task",
-    icon: <AiTwotoneFolderOpen className="mr-2 h-5 w-5" aria-hidden="true" />,
-    onClick: () => navigate(`/task/${task._id}`),
-  },
-  {
-    label: "Delete",
-    icon: <RiDeleteBin6Line className="mr-2 h-5 w-5" aria-hidden="true" />,
-    onClick: () => deleteClicks(),
-  },
-];
+  const items = [];
 
-if (!task?.isLocked) {
-  // Normal task: show Edit, Duplicate (Removed Add Sub-Task)
-  items.push(
-    {
-      label: "Edit",
-      icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
-      onClick: () => setOpenEdit(true),
-    },
-    {
-      label: "Duplicate",
-      icon: <HiDuplicate className="mr-2 h-5 w-5" aria-hidden="true" />,
-      onClick: () => duplicateHandler(),
+  if (task?.stage === "completed") {
+    items.push({
+      label: "Open Task",
+      icon: <AiTwotoneFolderOpen className="mr-2 h-5 w-5" aria-hidden="true" />,
+      onClick: () => navigate(`/task/${task._id}`),
+    });
+  } else {
+    items.push(
+      {
+        label: "Open Task",
+        icon: <AiTwotoneFolderOpen className="mr-2 h-5 w-5" aria-hidden="true" />,
+        onClick: () => navigate(`/task/${task._id}`),
+      },
+      {
+        label: "Delete",
+        icon: <RiDeleteBin6Line className="mr-2 h-5 w-5" aria-hidden="true" />,
+        onClick: () => setOpenDialog(true),
+      }
+    );
+
+    if (!task?.isLocked) {
+      items.push(
+        {
+          label: "Edit",
+          icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
+          onClick: () => setOpenEdit(true),
+        },
+        {
+          label: "Duplicate",
+          icon: <HiDuplicate className="mr-2 h-5 w-5" aria-hidden="true" />,
+          onClick: () => duplicateHandler(),
+        }
+      );
+    } else {
+      items.push({
+        label: "Extend Task",
+        icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
+        onClick: () => setOpenEdit(true),
+      });
     }
-  );
-} else {
-  // Overdue (locked) task: replace Edit with Extend Task, disable Add Subtask and Duplicate
-  items.push({
-    label: "Extend Task",
-    icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
-    onClick: () => setOpenEdit(true),
-  });
-}
-
-
-  
+  }
 
   return (
     <>
       <div>
         <Menu as="div" className="relative inline-block text-left">
-          <Menu.Button className="inline-flex w-full justify-center rounded-md px-4 py-2 text-sm font-medium text-gray-600 ">
+          <Menu.Button className="inline-flex w-full justify-center rounded-md px-4 py-2 text-sm font-medium text-gray-600">
             <BsThreeDots />
           </Menu.Button>
 
@@ -121,7 +113,7 @@ if (!task?.isLocked) {
                   <Menu.Item key={el.label}>
                     {({ active }) => (
                       <button
-                        onClick={el?.onClick}
+                        onClick={el.onClick}
                         className={`${
                           active ? "bg-blue-500 text-white" : "text-gray-900"
                         } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
@@ -144,7 +136,6 @@ if (!task?.isLocked) {
         task={task}
         key={new Date().getTime()}
       />
-
 
       <ConfirmatioDialog
         open={openDialog}
