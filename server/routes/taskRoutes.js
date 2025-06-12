@@ -19,6 +19,8 @@ import {
   autoAssignUsersToSubtask,
   assignMissingUsersToHighPrioritySubtasks,
   getFilePreview,
+  trashSubtask,
+  deleteRestoreSubtask
 } from "../controllers/taskController.js";
 import { isAdminRoute, protectRoute } from "../middlewares/authMiddleware.js";
 import upload from '../utils/multer.js';
@@ -63,6 +65,9 @@ router.delete('/:taskId/documents/:docId', deleteTaskDocument);
 
 router.post('/auto-assign/:taskId/:subtaskId', autoAssignUsersToSubtask);
 router.post('/assign-missing-high/:taskId/:subtaskId', assignMissingUsersToHighPrioritySubtasks);
+
+router.put("/trash-subtask/:subtaskId", protectRoute, isAdminRoute, trashSubtask); // ✅ New route
+router.delete("/delete-restore-subtask/:subtaskId", protectRoute, isAdminRoute, deleteRestoreSubtask); // ✅ New route
 
 
 

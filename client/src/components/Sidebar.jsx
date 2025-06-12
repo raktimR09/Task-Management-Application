@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   MdDashboard,
   MdOutlineAddTask,
@@ -9,86 +9,49 @@ import { FaTasks, FaTrashAlt, FaUsers } from "react-icons/fa";
 import { BiTimeFive } from "react-icons/bi";
 import { RiErrorWarningLine } from "react-icons/ri";
 import { useSelector, useDispatch } from "react-redux";
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { setOpenSidebar } from "../redux/slices/sidebarSlice";
-import { Link } from "react-router-dom";
-
-const linkData = [
-  {
-    label: "Dashboard",
-    link: "dashboard",
-    icon: <MdDashboard />,
-  },
-  {
-    label: "Tasks",
-    link: "tasks",
-    icon: <FaTasks />,
-  },
-  {
-    label: "Completed",
-    link: "completed/completed",
-    icon: <MdTaskAlt />,
-  },
-  {
-    label: "In Progress",
-    link: "in-progress/in progress",
-    icon: <BiTimeFive />,
-  },
-  {
-    label: "To Do",
-    link: "todo/todo",
-    icon: <MdOutlinePendingActions />,
-  },
-  {
-    label: "Users",
-    link: "users",
-    icon: <FaUsers />,
-  },
-  {
-    label: "Trash",
-    link: "trashed",
-    icon: <FaTrashAlt />,
-  },
-];
+import { IoChevronDown, IoChevronUp } from "react-icons/io5";
 
 const Sidebar = () => {
-  const authState = useSelector((state) => state.auth) || {};
-  const { user } = authState;
-
+  const { user } = useSelector((state) => state.auth) || {};
   const dispatch = useDispatch();
   const location = useLocation();
-
   const path = location.pathname.split("/")[1];
 
-  let sidebarLinks = [...linkData];
+  const [showStages, setShowStages] = useState(false);
 
-  if (user?.isAdmin) {
-    sidebarLinks.splice(5, 0, {
-      label: "Overdue",
-      link: "overdue/overdue",
-      icon: <RiErrorWarningLine />,
-    });
-  } else {
-    sidebarLinks = linkData.slice(0, 5);
-  }
+  const closeSidebar = () => dispatch(setOpenSidebar(false));
 
-  const closeSidebar = () => {
-    dispatch(setOpenSidebar(false));
-  };
+  const NavLink = ({ el, isChild }) => (
+    <Link
+      to={el.link}
+      onClick={closeSidebar}
+      className={`w-full flex gap-2 px-3 py-2 rounded-full items-center text-gray-800 text-base hover:bg-[#2564ed2d] ${
+        path === el.link.split("/")[0] ? "bg-blue-700 text-neutral-100" : ""
+      } ${isChild ? "ml-6 text-sm" : "lg:w-3/4"}`}
+    >
+      {el.icon}
+      <span className='hover:text-[#2564ed]'>{el.label}</span>
+    </Link>
+  );
 
-  const NavLink = ({ el }) => {
-    return (
-      <Link
-        to={el.link}
-        onClick={closeSidebar}
-        className={`w-full lg:w-3/4 flex gap-2 px-3 py-2 rounded-full items-center text-gray-800 text-base hover:bg-[#2564ed2d] 
-          ${path === el.link.split("/")[0] ? "bg-blue-700 text-neutral-100" : ""}`}
-      >
-        {el.icon}
-        <span className='hover:text-[#2564ed]'>{el.label}</span>
-      </Link>
-    );
-  };
+  const baseLinks = [
+    { label: "Dashboard", link: "dashboard", icon: <MdDashboard /> },
+    { label: "Projects", link: "tasks", icon: <FaTasks /> },
+  ];
+
+  const adminLinks = [
+    { label: "Members", link: "users", icon: <FaUsers /> },
+    { label: "Trash", link: "trashed", icon: <FaTrashAlt /> },
+  ];
+
+  const stageLinks = [
+    { label: "To Do", link: "todo/todo", icon: <MdOutlinePendingActions /> },
+    { label: "In Progress", link: "in-progress/in progress", icon: <BiTimeFive /> },
+    { label: "Completed", link: "completed/completed", icon: <MdTaskAlt /> },
+    { label: "Overdue", link: "overdue/overdue", icon: <RiErrorWarningLine /> },
+  ];
 
   return (
     <div className='w-full h-full flex flex-col gap-6 p-5'>
@@ -102,7 +65,33 @@ const Sidebar = () => {
       </h1>
 
       <div className='flex-1 flex flex-col gap-y-5 py-8'>
-        {sidebarLinks.map((link) => (
+        {/* Always visible: Dashboard & Projects */}
+        {baseLinks.map((link) => (
+          <NavLink el={link} key={link.label} />
+        ))}
+
+        {/* Now visible to all users */}
+        <button
+          onClick={() => setShowStages((prev) => !prev)}
+          className={`w-full lg:w-3/4 flex justify-between items-center gap-2 px-3 py-2 rounded-full text-gray-800 text-base hover:bg-[#2564ed2d]`}
+        >
+          <div className='flex items-center gap-2'>
+            <BiTimeFive />
+            <span className='hover:text-[#2564ed]'>Status</span>
+          </div>
+          {showStages ? <IoChevronUp /> : <IoChevronDown />}
+        </button>
+
+        {showStages && (
+          <div className="flex flex-col gap-3">
+            {stageLinks.map((stage) => (
+              <NavLink el={stage} key={stage.label} isChild />
+            ))}
+          </div>
+        )}
+
+        {/* Admin-only links */}
+        {user?.isAdmin && adminLinks.map((link) => (
           <NavLink el={link} key={link.label} />
         ))}
       </div>

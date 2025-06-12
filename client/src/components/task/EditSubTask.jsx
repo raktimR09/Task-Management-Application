@@ -48,14 +48,14 @@ const EditSubTask = ({ open, setOpen, subTask, team = [], taskDeadline }) => {
     };
 
     if (subDeadline > parentDeadline) {
-      toast.error("Subtask deadline cannot be later than task deadline.");
+      toast.error("Task deadline cannot be later than project deadline.");
       return;
     }
 
     try {
       const response = await updateSubTask({ id: subTask._id, data: subtaskData }).unwrap();
       if (response) {
-        toast.success("Subtask updated successfully!");
+        toast.success("Task updated successfully!");
         setTimeout(() => {
         setOpen(false);             // Close modal
         window.location.reload();   // Refresh page
@@ -63,7 +63,7 @@ const EditSubTask = ({ open, setOpen, subTask, team = [], taskDeadline }) => {
       }
     } catch (error) {
       console.error("Update failed:", error?.data || error?.message || error);
-      toast.error(error?.data?.message || "Something went wrong while updating the subtask.");
+      toast.error(error?.data?.message || "Something went wrong while updating the task.");
     }
   };
 
@@ -71,7 +71,7 @@ const EditSubTask = ({ open, setOpen, subTask, team = [], taskDeadline }) => {
     <ModalWrapper open={open} setOpen={setOpen}>
       <form onSubmit={handleSubmit(handleOnSubmit)}>
         <Dialog.Title as="h2" className="text-base font-bold leading-6 text-gray-900 mb-4">
-          EDIT SUB-TASK
+          EDIT TASK
         </Dialog.Title>
 
         <div className="mt-2 flex flex-col gap-6">
@@ -156,7 +156,7 @@ const EditSubTask = ({ open, setOpen, subTask, team = [], taskDeadline }) => {
           <Button
             type="submit"
             className="bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 sm:ml-3 sm:w-auto"
-            label="Update Subtask"
+            label="Update Task"
           />
           <Button
             type="button"

@@ -157,6 +157,24 @@ export const taskApiSlice=apiSlice.injectEndpoints({
                   credentials: "include",
                 }),
               }),
+
+              trashSubtask: builder.mutation({
+  query: ({ subtaskId }) => ({
+    url: `/task/trash-subtask/${subtaskId}`,
+    method: "PUT",
+    credentials: "include",
+  }),
+}),
+
+
+deleteRestoreSubtask: builder.mutation({
+  query: ({ subtaskId, actionType }) => ({
+    url: `/task/delete-restore-subtask/${subtaskId}?actionType=${actionType}`,
+    method: "DELETE",
+    credentials: "include",
+  }),
+}),
+
     }),
 });
 
@@ -176,5 +194,7 @@ export const{useGetDashboardStatsQuery,
     useDeleteTaskDocumentMutation,
     useAutoAssignUsersToHighPrioritySubtasksMutation,
     useAssignMissingUsersToHighPrioritySubtasksMutation,
-    useGetFilePreviewQuery
+    useGetFilePreviewQuery,
+    useDeleteRestoreSubtaskMutation,
+    useTrashSubtaskMutation
 }=taskApiSlice

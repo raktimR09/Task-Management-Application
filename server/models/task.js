@@ -24,6 +24,7 @@ const subTaskSchema = new Schema(
       enum: ["todo", "in progress", "completed", "overdue"],
       default: "todo",
     },
+    isTrashed: { type: Boolean, default: false },
     activities: [
       {
         type: {
@@ -103,7 +104,7 @@ taskSchema.virtual("priority").get(function () {
 // Is task locked (based on deadline and completion)
 taskSchema.virtual("isLocked").get(function () {
   const now = new Date();
-  return this.stage !== "completed" && this.deadline < now;
+  return this.stage !== "completed" && this.deadline <= now;
 });
 
 // Computed priority + effective stage for each subtask (virtual only)

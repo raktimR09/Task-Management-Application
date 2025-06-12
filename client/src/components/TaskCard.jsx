@@ -15,7 +15,7 @@ import UserInfo from "./UserInfo";
 import { IoMdAdd, IoMdPeople } from "react-icons/io";
 import AddSubTask from "./task/AddSubTask";
 import EditSubTask from "./task/EditSubTask";
-import { useDeleteSubTaskMutation } from "../redux/slices/api/taskApiSlice";
+import { useTrashSubtaskMutation } from "../redux/slices/api/taskApiSlice";
 import { toast } from "sonner";
 
 const ICONS = {
@@ -30,7 +30,7 @@ const TaskCard = ({ task }) => {
   const [editOpen, setEditOpen] = useState(false);
   const [selectedSubTask, setSelectedSubTask] = useState(null);
   const [previousStage, setPreviousStage] = useState(null);
-  const [deleteSubTask] = useDeleteSubTaskMutation();
+const [trashSubtask] = useTrashSubtaskMutation();
 
   const priority = task?.priority?.toLowerCase();
   const isCompleted = task?.stage?.toLowerCase() === "completed";
@@ -115,15 +115,17 @@ const TaskCard = ({ task }) => {
   };
 
   const handleDeleteSubTask = async (subtaskId) => {
-    try {
-      const res = await deleteSubTask({ taskId: task._id, subtaskId }).unwrap();
-      toast.success(res?.message);
-      window.location.reload();
-    } catch (error) {
-      console.error("Error deleting subtask:", error);
-      toast.error("Failed to delete subtask");
-    }
-  };
+  try {
+    const res = await trashSubtask({ subtaskId }).unwrap();
+    console.log(res);
+    console.log("Trashed")
+    toast.success(res?.message || "Subtask trashed");
+    //window.location.reload();
+  } catch (error) {
+    console.error("Error trashing subtask:", error);
+    toast.error("Failed to trash subtask");
+  }
+};
 
   const handleEditSubTask = () => {
     setEditOpen(false);
@@ -186,80 +188,82 @@ const TaskCard = ({ task }) => {
         </div>
 
         {/* Subtasks */}
-        <div className="py-4 border-t border-gray-200">
-          {task?.subTasksWithPriority?.length > 0 ? (
-            sortSubTasksByTimeLeft(task.subTasksWithPriority).map((sub, index) => {
-              const isSubCompleted = sub?.stage?.toLowerCase() === "completed";
-              const isSubExpired =
-                !isSubCompleted && new Date(sub.deadline) < new Date();
-              const disableActions = isSubCompleted || isSubExpired;
+        {/* Subtasks */}
+<div className="py-4 border-t border-gray-200">
+  {task?.subTasksWithPriority?.filter((sub) => !sub.isTrashed).length > 0 ? (
+    sortSubTasksByTimeLeft(task.subTasksWithPriority.filter((sub) => !sub.isTrashed)).map((sub, index) => {
+      const isSubCompleted = sub?.stage?.toLowerCase() === "completed";
+      const isSubExpired =
+        !isSubCompleted && new Date(sub.deadline) < new Date();
+      const disableActions = isSubCompleted || isSubExpired;
 
-              return (
-                <div key={index} className="mb-4">
-                  <div className="flex justify-between items-start">
-                    <h5 className="text-base font-semibold text-black">
-                      {sub.title}
-                    </h5>
-                    {user?.isAdmin && !task?.isLocked && (
-                      <div className="flex items-center gap-2">
-                        {!disableActions && (
-                          <>
-                            <button
-                              className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-                              onClick={() => handleEdit(sub)}
-                            >
-                              <FaEdit /> Edit
-                            </button>
-                            <button
-                              className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
-                              onClick={() => handleDeleteSubTask(sub._id)}
-                            >
-                              <FaTrashAlt /> Delete
-                            </button>
-                          </>
-                        )}
+      return (
+        <div key={index} className="mb-4">
+          <div className="flex justify-between items-start">
+            <h5 className="text-base font-semibold text-black">
+              {sub.title}
+            </h5>
+            {user?.isAdmin && !task?.isLocked && (
+              <div className="flex items-center gap-2">
+                {!disableActions && (
+                  <>
+                    <button
+                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                      onClick={() => handleEdit(sub)}
+                    >
+                      <FaEdit /> Edit
+                    </button>
+                    <button
+                      className="text-red-600 hover:text-red-800 text-sm flex items-center gap-1"
+                      onClick={() => handleDeleteSubTask(sub._id)}
+                    >
+                      <FaTrashAlt /> Delete
+                    </button>
+                  </>
+                )}
 
-                        {isSubExpired && !isSubCompleted && (
-                          <button
-                            className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
-                            onClick={() => handleExtend(sub)}
-                          >
-                            🕒 Extend
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                {isSubExpired && !isSubCompleted && (
+                  <button
+                    className="text-yellow-600 hover:text-yellow-800 text-sm flex items-center gap-1"
+                    onClick={() => handleExtend(sub)}
+                  >
+                    🕒 Extend
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
-                  <div className="pl-2 text-sm text-gray-700 space-y-1 mt-1">
-                    <div>⏰ {formatDate(new Date(sub.deadline))}</div>
-                    <div>{renderSubtaskStatus(sub)}</div>
-                    <div>
-                      <span className="bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium inline-block">
-                        {sub.tag}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      {sub.members?.map((m, i) => (
-                        <div
-                          key={i}
-                          className={clsx(
-                            "w-6 h-6 rounded-full text-white flex items-center justify-center text-xs",
-                            BGS[i % BGS.length]
-                          )}
-                        >
-                          <UserInfo user={m} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+          <div className="pl-2 text-sm text-gray-700 space-y-1 mt-1">
+            <div>⏰ {formatDate(new Date(sub.deadline))}</div>
+            <div>{renderSubtaskStatus(sub)}</div>
+            <div>
+              <span className="bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium inline-block">
+                {sub.tag}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {sub.members?.map((m, i) => (
+                <div
+                  key={i}
+                  className={clsx(
+                    "w-6 h-6 rounded-full text-white flex items-center justify-center text-xs",
+                    BGS[i % BGS.length]
+                  )}
+                >
+                  <UserInfo user={m} />
                 </div>
-              );
-            })
-          ) : (
-            <span className="text-gray-500">No Sub Task</span>
-          )}
+              ))}
+            </div>
+          </div>
         </div>
+      );
+    })
+  ) : (
+    <span className="text-gray-500">No Task</span>
+  )}
+</div>
+
 
         <div className="w-full pb-2">
           <button
@@ -268,7 +272,7 @@ const TaskCard = ({ task }) => {
             className="w-full flex gap-4 items-center text-sm text-gray-500 font-semibold disabled:cursor-not-allowed disabled:text-gray-300"
           >
             <IoMdAdd className="text-lg" />
-            <span>ADD SUBTASK</span>
+            <span>ADD TASK</span>
           </button>
         </div>
       </div>

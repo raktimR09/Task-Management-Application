@@ -25,7 +25,7 @@ const UserList = ({ setTeam, team }) => {
 
   return (
     <div>
-      <p className='text-gray-700'>Assign Task To: </p>
+      <p className='text-gray-700'>Assign Project To: </p>
       <Listbox
         value={selectedUsers}
         onChange={(el) => handleChange(el)}

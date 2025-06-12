@@ -27,14 +27,12 @@ export function dateFormatter(dateString) {
 }
 
 export function getInitials(fullName) {
-  const names = fullName.split(" ");
-
+  if (typeof fullName !== "string" || fullName.trim() === "") return "?";
+  const names = fullName.trim().split(" ").filter(Boolean); // remove extra spaces
   const initials = names.slice(0, 2).map((name) => name[0].toUpperCase());
-
-  const initialsStr = initials.join("");
-
-  return initialsStr;
+  return initials.join("") || "?";
 }
+
 
 export const PRIOTITYSTYELS = {
   high: "text-red-600",

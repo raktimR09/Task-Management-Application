@@ -33,21 +33,21 @@ const AddSubTask = ({ open, setOpen, id, team = [], taskDeadline }) => {
     const parentDeadline = new Date(taskDeadline);
 
     if (subDeadline > parentDeadline) {
-      toast.error("Subtask deadline cannot be later than task deadline.");
+      toast.error("Task deadline cannot be later than project deadline.");
       return;
     }
 
     try {
       const res = await addSbTask({ data, id }).unwrap();
-      toast.success("Subtask added successfully!");
+      toast.success("Task added successfully!");
       setTimeout(() => {
         setOpen(false);             // Close modal
         window.location.reload();   // Refresh page
       }, 500);
     } catch (error) {
-      console.error("Error adding subtask:", error);
+      console.error("Error adding task:", error);
       toast.error(
-        error?.data?.message || "Something went wrong while adding the subtask."
+        error?.data?.message || "Something went wrong while adding the task."
       );
     }
   };
@@ -68,12 +68,12 @@ const AddSubTask = ({ open, setOpen, id, team = [], taskDeadline }) => {
           as="h2"
           className="text-base font-bold leading-6 text-gray-900 mb-4"
         >
-          ADD SUB-TASK
+          ADD TASK
         </Dialog.Title>
 
         <div className="mt-2 flex flex-col gap-6">
           <Textbox
-            placeholder="Sub-Task title"
+            placeholder="Task title"
             type="text"
             name="title"
             label="Title"
@@ -160,7 +160,7 @@ const AddSubTask = ({ open, setOpen, id, team = [], taskDeadline }) => {
           <Button
             type="submit"
             className="bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 sm:ml-3 sm:w-auto"
-            label="Add Subtask"
+            label="Add Task"
           />
           <Button
             type="button"

@@ -163,88 +163,116 @@ if (!isUserAssigned) {
   }
 };
 
-
-
 export const dashboardStatistics = async (req, res) => {
   try {
     const { userId, isAdmin } = req.user;
 
+    // Shared query options for population
+    const populateOptions = [
+      { path: "team", select: "name role title email" },
+      {
+        path: "subTasks.members", // ✅ populate subtask members
+        select: "name email title role", // necessary fields
+      },
+    ];
+
+    // Fetch tasks based on user role
     const allTasks = isAdmin
-      ? await Task.find({
-          isTrashed: false,
-        })
-          .populate({
-            path: "team",
-            select: "name role title email",
-          })
+      ? await Task.find({ isTrashed: false })
+          .populate(populateOptions)
           .sort({ _id: -1 })
       : await Task.find({
           isTrashed: false,
           team: { $all: [userId] },
         })
-          .populate({
-            path: "team",
-            select: "name role title email",
-          })
+          .populate(populateOptions)
           .sort({ _id: -1 });
 
-    const users = await User.find({ isActive: true })
-      .select("name title role isAdmin createdAt")
-      .limit(10)
-      .sort({ _id: -1 });
+    // Fetch users (only for admin)
+    const users = isAdmin
+      ? await User.find({ isActive: true })
+          .select("name title role isAdmin createdAt")
+          .limit(10)
+          .sort({ _id: -1 })
+      : [];
 
-    //   group task by stage and calculate counts
-    const groupTaskks = allTasks.reduce((result, task) => {
-      const stage = task.stage;
-
-      if (!result[stage]) {
-        result[stage] = 1;
-      } else {
-        result[stage] += 1;
-      }
-
+    // Group tasks by stage
+    const groupTasksByStage = allTasks.reduce((result, task) => {
+      const stage = task.stage || "Not Set";
+      result[stage] = (result[stage] || 0) + 1;
       return result;
     }, {});
 
-    // Group tasks by priority
+    // Group tasks by priority for chart data
     const groupData = Object.entries(
       allTasks.reduce((result, task) => {
         const { priority } = task;
-
         result[priority] = (result[priority] || 0) + 1;
         return result;
       }, {})
     ).map(([name, total]) => ({ name, total }));
 
-    // calculate total tasks
-    const totalTasks = allTasks?.length;
-    const last10Task = allTasks?.slice(0, 10);
+    // Extract all subtasks from all tasks
+    const allSubtasks = allTasks.flatMap((task) =>
+      (task.subTasks || []).map((subtask) => ({
+        ...subtask.toObject(),
+        taskId: task._id,
+        taskTitle: task.title,
+      }))
+    );
 
-    const summary = {
-      totalTasks,
-      last10Task,
-      users: isAdmin ? users : [],
-      tasks: groupTaskks,
-      graphData: groupData,
-    };
+    // Subtask stage stats
+    const subtaskStageStats = allSubtasks.reduce((acc, subtask) => {
+      const stage = subtask.stage || "Not Set";
+      acc[stage] = (acc[stage] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Subtask member assignment stats
+    const subtaskMemberCounts = allSubtasks
+      .flatMap((subtask) => subtask.members || [])
+      .reduce((acc, member) => {
+        const id = typeof member === "object" ? member._id : member;
+        acc[id] = (acc[id] || 0) + 1;
+        return acc;
+      }, {});
+
+    // Prepare response
+    const totalTasks = allTasks.length;
+    const last10Task = allTasks.slice(0, 10);
 
     res.status(200).json({
       status: true,
       message: "Successfully",
-      ...summary,
+      allTasks, // for task dropdown, etc.
+      totalTasks,
+      last10Task,
+      users,
+      tasks: groupTasksByStage,
+      graphData: groupData,
+      subtaskStats: {
+        byStage: subtaskStageStats,
+        byMember: subtaskMemberCounts,
+      },
     });
   } catch (error) {
-    console.log(error);
+    console.error("Dashboard Statistics Error:", error);
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
 
 export const getTasks = async (req, res) => {
   try {
     const { stage, isTrashed } = req.query;
 
-    let query = { isTrashed: isTrashed ? true : false };
-    if (stage) query.stage = stage;
+    const query = {};
+    if (typeof isTrashed !== "undefined") {
+      query.isTrashed = isTrashed === "true";
+    }
+    if (stage) {
+      query.stage = stage;
+    }
 
     let tasks = await Task.find(query)
       .populate({
@@ -257,24 +285,47 @@ export const getTasks = async (req, res) => {
       })
       .sort({ _id: -1 });
 
-    // Automatically mark overdue tasks
     const now = new Date();
-    tasks = tasks.map(task => {
+    const trashedSubtasks = [];
+
+    // Prepare filtered tasks and collect trashed subtasks
+    const filteredTasks = tasks.map((task) => {
+      // Mark overdue tasks
       if (task.deadline < now && task.stage !== "completed") {
-        task.stage = "overdue"; // Update the stage in memory
+        task.stage = "overdue";
       }
+
+      // Split subTasks into active and trashed
+      const activeSubTasks = [];
+      task.subTasks.forEach((sub) => {
+        if (sub.isTrashed) {
+          trashedSubtasks.push({
+            ...sub.toObject(),
+            parentTaskTitle: task.title,
+          });
+        } else {
+          activeSubTasks.push(sub);
+        }
+      });
+
+      // Replace subTasks with only active ones
+      task.subTasks = activeSubTasks;
+
       return task;
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       status: true,
-      tasks,
+      tasks: filteredTasks,
+      trashedSubtasks,
     });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return res.status(400).json({ status: false, message: error.message });
   }
 };
+
+
 
 export const getTask = async (req, res) => {
   try {
@@ -887,6 +938,99 @@ export const getFilePreview = async (req, res) => {
   }
 };
 
+
+
+
+
+
+export const deleteRestoreSubtask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { actionType } = req.query;
+
+    if (!["delete", "deleteAll", "restore", "restoreAll"].includes(actionType)) {
+      return res.status(400).json({ status: false, message: "Invalid action type" });
+    }
+
+    if (actionType === "delete") {
+      const task = await Task.findOne({ "subTasks._id": id });
+      if (!task) return res.status(404).json({ status: false, message: "Subtask not found." });
+
+      task.subTasks = task.subTasks.filter((st) => st._id.toString() !== id);
+      await task.save();
+
+    } else if (actionType === "deleteAll") {
+      const tasks = await Task.find({ "subTasks.isTrashed": true });
+      for (const task of tasks) {
+        task.subTasks = task.subTasks.filter((st) => !st.isTrashed);
+        await task.save();
+      }
+
+    } else if (actionType === "restore") {
+      const task = await Task.findOne({ "subTasks._id": id });
+      if (!task) return res.status(404).json({ status: false, message: "Subtask not found." });
+
+      const sub = task.subTasks.id(id);
+      sub.isTrashed = false;
+      await task.save();
+
+    } else if (actionType === "restoreAll") {
+      const tasks = await Task.find({ "subTasks.isTrashed": true });
+      for (const task of tasks) {
+        task.subTasks.forEach((st) => {
+          if (st.isTrashed) st.isTrashed = false;
+        });
+        await task.save();
+      }
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: `Subtask '${actionType}' action performed successfully.`,
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+};
+
+
+export const trashSubtask = async (req, res) => {
+  try {
+    const { subtaskId } = req.params;
+
+    const task = await Task.findOne({ "subTasks._id": subtaskId });
+
+    if (!task) {
+      return res.status(404).json({
+        status: false,
+        message: "Parent task or subtask not found.",
+      });
+    }
+
+    const subtask = task.subTasks.id(subtaskId);
+
+    if (!subtask) {
+      return res.status(404).json({
+        status: false,
+        message: "Subtask not found.",
+      });
+    }
+
+    subtask.isTrashed = true;
+
+    await task.save();
+
+    res.status(200).json({
+      status: true,
+      message: "Subtask trashed successfully.",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ status: false, message: error.message });
+  }
+};
 
 
 

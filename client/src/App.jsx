@@ -1,3 +1,4 @@
+// App.jsx
 import { Transition } from "@headlessui/react";
 import clsx from "clsx";
 import { Fragment, useRef } from "react";
@@ -19,9 +20,9 @@ import Tasks from "./pages/Tasks";
 import Trash from "./pages/Trash";
 import Users from "./pages/Users";
 import Dashboard from "./pages/dashboard";
-import { setOpenSidebar } from "./redux/slices/sidebarSlice";
 import ResetPassword from "./pages/ResetPassword";
 import SignUp from "./pages/SignUp";
+import WelcomePage from "./pages/WelcomePage"; // 👈 New import
 
 function Layout() {
   const { user } = useSelector((state) => state.auth);
@@ -99,8 +100,14 @@ function App() {
   return (
     <main className='w-full min-h-screen bg-[#f3f4f6] text-black'>
       <Routes>
+        {/* Public Routes */}
+        <Route path='/' element={<WelcomePage />} />
+        <Route path='/log-in' element={<Login />} />
+        <Route path='/reset-password/:token' element={<ResetPassword />} />
+        <Route path='/register' element={<SignUp />} />
+
+        {/* Protected Routes */}
         <Route element={<Layout />}>
-          <Route index path='/' element={<Navigate to='/dashboard' />} />
           <Route path='/dashboard' element={<Dashboard />} />
           <Route path='/tasks' element={<Tasks />} />
           <Route path='/completed/:status' element={<Tasks />} />
@@ -111,10 +118,6 @@ function App() {
           <Route path='/trashed' element={<Trash />} />
           <Route path='/task/:id' element={<TaskDetails />} />
         </Route>
-
-        <Route path='/log-in' element={<Login />} />
-        <Route path='/reset-password/:token' element={<ResetPassword />} />
-        <Route path='/register' element={<SignUp />} />
       </Routes>
 
       <Toaster richColors />

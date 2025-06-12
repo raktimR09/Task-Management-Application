@@ -49,8 +49,8 @@ const bgColor = {
 };
 
 const TABS = [
-  { title: "Task Detail", icon: <FaTasks /> },
-  { title: "Activities/Timeline", icon: <RxActivityLog /> },
+  { title: "Project Detail", icon: <FaTasks /> },
+  { title: "Task Report", icon: <RxActivityLog /> },
 ];
 
 const TASKTYPEICON = {
@@ -189,7 +189,7 @@ const Activities = ({ id, refetch }) => {
     <div className="w-full flex gap-10 2xl:gap-20 min-h-screen px-10 py-8 bg-white shadow rounded-md justify-between overflow-y-auto">
       {/* Activity Feed */}
       <div className="w-full md:w-1/2">
-        <h4 className="text-gray-600 font-semibold text-lg mb-5">Subtask Activities</h4>
+        <h4 className="text-gray-600 font-semibold text-lg mb-5">Subtasks</h4>
 
         {isAdmin ? (
           allActivitiesBySubtask.length > 0 ? (
@@ -199,23 +199,23 @@ const Activities = ({ id, refetch }) => {
                 {activities.length > 0 ? (
                   activities.map((act, idx) => <Card key={idx} item={act} />)
                 ) : (
-                  <p className="text-gray-400 italic">No activity for this subtask.</p>
+                  <p className="text-gray-400 italic">No subtasks for this task.</p>
                 )}
               </div>
             ))
           ) : (
-            <p className="text-gray-400 italic">No subtasks or activities available.</p>
+            <p className="text-gray-400 italic">No subtasks available.</p>
           )
         ) : (
           <>
             {!selectedSubtask ? (
               <p className="text-gray-400 italic">
-                Select a subtask to view its activity log.
+                Select a task to view its activity log.
               </p>
             ) : activity.length > 0 ? (
               activity.map((el, idx) => <Card key={idx} item={el} />)
             ) : (
-              <p className="text-gray-400 italic">No activity recorded for this subtask.</p>
+              <p className="text-gray-400 italic">No subtasks recorded for this task.</p>
             )}
           </>
         )}
@@ -224,32 +224,42 @@ const Activities = ({ id, refetch }) => {
       {/* Add Activity */}
       {canAddActivity && (
         <div className="w-full md:w-1/3">
-          <h4 className="text-gray-600 font-semibold text-lg mb-5">Add Activity</h4>
+          <h4 className="text-gray-600 font-semibold text-lg mb-5">Add Subtask</h4>
 
           <label className="block mb-2">
-            <span className="text-gray-700">For Subtask:</span>
-            <select
-              className="mt-1 block w-full border border-gray-300 rounded p-2"
-              value={selectedSubtask}
-              onChange={(e) => setSelectedSubtask(e.target.value)}
-            >
-              <option value="">-- Select a subtask --</option>
-              {sortedSubtasks.map((st) => (
-                <option
-                  key={st._id}
-                  value={st._id}
-                  disabled={st.stage === "overdue" || st.stage === "completed"}
-                >
-                  {st.title}{" "}
-                  {st.stage === "overdue"
-                    ? "(Overdue)"
-                    : st.stage === "completed"
-                    ? "(Completed)"
-                    : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+  <span className="text-gray-700">For Task:</span>
+  <select
+    className="mt-1 block w-full border border-gray-300 rounded p-2"
+    value={selectedSubtask}
+    onChange={(e) => setSelectedSubtask(e.target.value)}
+  >
+    <option value="">-- Select a task --</option>
+    {sortedSubtasks.map((st) => {
+      const isAssigned = st.members?.some((m) => m._id === user?._id);
+      const isDisabled =
+        st.stage === "overdue" || st.stage === "completed" || !isAssigned;
+
+      return (
+        <option
+          key={st._id}
+          value={st._id}
+          disabled={isDisabled}
+          className={isDisabled ? "text-gray-400" : ""}
+        >
+          {st.title}
+          {st.stage === "overdue"
+            ? " (Overdue)"
+            : st.stage === "completed"
+            ? " (Completed)"
+            : !isAssigned
+            ? " (Not Assigned)"
+            : ""}
+        </option>
+      );
+    })}
+  </select>
+</label>
+
 
           <div className="flex flex-wrap gap-5 mb-4">
             {act_types.map((item) => (
@@ -270,7 +280,7 @@ const Activities = ({ id, refetch }) => {
             rows={6}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Describe your activity…"
+            placeholder="Describe your subtask…"
             className="w-full border border-gray-300 rounded p-3 focus:ring-2 ring-blue-500"
           />
 
@@ -301,8 +311,8 @@ const TaskDetails = () => {
   const { user } = useSelector((state) => state.auth);
 
   if (!id) {
-    console.error("Task ID is missing!");
-    return <div className="p-4 text-red-500">No task selected.</div>;
+    console.error("Project ID is missing!");
+    return <div className="p-4 text-red-500">No project selected.</div>;
   }
 
   const { data, isLoading, refetch } = useGetSingleTaskQuery({ id });
@@ -322,7 +332,7 @@ const TaskDetails = () => {
   const handleAutoAssignUsersClick = async (taskId, subtaskId, priority) => {
     try {
       const res = await autoAssignUsers({ taskId, subtaskId }).unwrap();
-      toast.success("Users added to high priority subtask!");
+      toast.success("Users added to high priority task!");
       refetch();
     } catch (error) {
       if (error?.data) {
@@ -412,14 +422,14 @@ const TaskDetails = () => {
                 {/* Asset/SubTask count */}
                 <div className="flex items-center gap-8 p-4 border-y border-gray-200">
                   <div className="space-x-2">
-                    <span className="font-semibold">Sub-Task :</span>
+                    <span className="font-semibold">Tasks :</span>
                     <span>{task?.subTasks?.length}</span>
                   </div>
                 </div>
 
                 {/* Task Team */}
                 <div className="space-y-4 py-6">
-                  <p className="text-gray-600 font-semibold text-sm">TASK TEAM</p>
+                  <p className="text-gray-600 font-semibold text-sm">PROJECT MEMBERS</p>
                   <div className="space-y-3">
                     {task?.team?.map((m, index) => (
                       <div key={index} className="flex gap-4 py-2 items-center border-t border-gray-200">
@@ -437,7 +447,7 @@ const TaskDetails = () => {
 
                 {/* Sub-Tasks */}
                 <div className="space-y-4 py-6">
-                  <p className="text-gray-500 font-semibold text-sm">SUB-TASKS</p>
+                  <p className="text-gray-500 font-semibold text-sm">TASKS</p>
 
                   <div className="space-y-8">
                     {(task?.subTasksWithPriority || [])
@@ -476,14 +486,15 @@ const TaskDetails = () => {
                               )}
 
                               {/* Subtask Expired Warning (only if NOT completed) */}
-                              {!isCompleted && isExpired && (
-                                <div className="bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col">
-                                  <p className="text-red-800 text-sm font-semibold">❌ Subtask Expired</p>
-                                </div>
-                              )}
+                              {!isCompleted && (isExpired || el.stage === "overdue") && (
+  <div className="bg-red-100 border border-red-300 rounded-md p-3 mt-2 flex flex-col">
+    <p className="text-red-800 text-sm font-semibold">❌ Subtask Expired</p>
+  </div>
+)}
+
 
                               {/* Assign Users Section (only if NOT completed and NOT expired and High Priority) */}
-                              {!isCompleted && !isExpired && el.priority === "high" && (
+                              {!isCompleted && !isExpired && el.stage !== "overdue" && el.priority === "high" && (
                                 <div className="bg-yellow-100 border border-yellow-300 rounded-md p-3 mt-2 flex flex-col gap-2">
                                   <p className="text-yellow-800 text-sm">
                                     ⚠️ Subtask Priority: <strong>High</strong>. Recommended to add users!
