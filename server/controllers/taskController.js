@@ -1032,5 +1032,27 @@ export const trashSubtask = async (req, res) => {
   }
 };
 
+export const getTasksByFilter = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const query = {};
+
+    if (startDate && endDate) {
+      query.deadline = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    const tasks = await Task.find(query); // Or from Project.tasks if embedded
+
+    return res.status(200).json({ tasks });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Failed to fetch report tasks" });
+  }
+};
+
+
 
 

@@ -175,6 +175,27 @@ deleteRestoreSubtask: builder.mutation({
   }),
 }),
 
+getReportTasks: builder.query({
+  query: ({ startDate, endDate } = {}) => {
+    let query = "/task/report";
+    const params = new URLSearchParams();
+
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+
+    if (params.toString()) query += `?${params.toString()}`;
+
+    return {
+      url: query,
+      method: "GET",
+      credentials: "include",
+    };
+  },
+}),
+
+
+
+
     }),
 });
 
@@ -196,5 +217,7 @@ export const{useGetDashboardStatsQuery,
     useAssignMissingUsersToHighPrioritySubtasksMutation,
     useGetFilePreviewQuery,
     useDeleteRestoreSubtaskMutation,
-    useTrashSubtaskMutation
+    useTrashSubtaskMutation,
+    useGetReportTasksQuery, 
+    useLazyGetReportTasksQuery
 }=taskApiSlice

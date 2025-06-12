@@ -23,6 +23,8 @@ import Dashboard from "./pages/dashboard";
 import ResetPassword from "./pages/ResetPassword";
 import SignUp from "./pages/SignUp";
 import WelcomePage from "./pages/WelcomePage"; // 👈 New import
+import Report from "./pages/Report"; // 👈 Add this line
+
 
 function Layout() {
   const { user } = useSelector((state) => state.auth);
@@ -117,6 +119,8 @@ function App() {
           <Route path='/users' element={<Users />} />
           <Route path='/trashed' element={<Trash />} />
           <Route path='/task/:id' element={<TaskDetails />} />
+          <Route path='/report' element={<Report />} />
+
         </Route>
       </Routes>
 

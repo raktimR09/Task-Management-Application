@@ -24,6 +24,13 @@ const ICONS = {
   low: <MdKeyboardArrowDown />,
 };
 
+const TASK_STAGE_COLORS = {
+  todo: "bg-yellow-400",
+  "in progress": "bg-blue-400",
+  completed: "bg-green-400",
+  overdue: "bg-red-400",
+};
+
 const TaskCard = ({ task }) => {
   const { user } = useSelector((state) => state.auth);
   const [open, setOpen] = useState(false);
@@ -120,7 +127,7 @@ const [trashSubtask] = useTrashSubtaskMutation();
     console.log(res);
     console.log("Trashed")
     toast.success(res?.message || "Subtask trashed");
-    //window.location.reload();
+    window.location.reload();
   } catch (error) {
     console.error("Error trashing subtask:", error);
     toast.error("Failed to trash subtask");
@@ -236,6 +243,7 @@ const [trashSubtask] = useTrashSubtaskMutation();
 
           <div className="pl-2 text-sm text-gray-700 space-y-1 mt-1">
             <div>⏰ {formatDate(new Date(sub.deadline))}</div>
+            <div> 📈 {(sub.stage || "").split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}</div>
             <div>{renderSubtaskStatus(sub)}</div>
             <div>
               <span className="bg-blue-600/10 px-3 py-1 rounded-full text-blue-700 font-medium inline-block">

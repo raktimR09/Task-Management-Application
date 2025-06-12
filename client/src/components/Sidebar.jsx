@@ -7,7 +7,7 @@ import {
 } from "react-icons/md";
 import { FaTasks, FaTrashAlt, FaUsers } from "react-icons/fa";
 import { BiTimeFive } from "react-icons/bi";
-import { RiErrorWarningLine } from "react-icons/ri";
+import { RiErrorWarningLine, RiFileChartLine } from "react-icons/ri"; // 👈 Added report icon
 import { useSelector, useDispatch } from "react-redux";
 import { useLocation, Link } from "react-router-dom";
 import { setOpenSidebar } from "../redux/slices/sidebarSlice";
@@ -42,7 +42,8 @@ const Sidebar = () => {
   ];
 
   const adminLinks = [
-    { label: "Members", link: "users", icon: <FaUsers /> },
+    { label: "Users", link: "users", icon: <FaUsers /> },
+    { label: "Report", link: "report", icon: <RiFileChartLine /> }, // 👈 New Report link
     { label: "Trash", link: "trashed", icon: <FaTrashAlt /> },
   ];
 
@@ -70,10 +71,10 @@ const Sidebar = () => {
           <NavLink el={link} key={link.label} />
         ))}
 
-        {/* Now visible to all users */}
+        {/* Status/Stage toggle */}
         <button
           onClick={() => setShowStages((prev) => !prev)}
-          className={`w-full lg:w-3/4 flex justify-between items-center gap-2 px-3 py-2 rounded-full text-gray-800 text-base hover:bg-[#2564ed2d]`}
+          className='w-full lg:w-3/4 flex justify-between items-center gap-2 px-3 py-2 rounded-full text-gray-800 text-base hover:bg-[#2564ed2d]'
         >
           <div className='flex items-center gap-2'>
             <BiTimeFive />
@@ -82,6 +83,7 @@ const Sidebar = () => {
           {showStages ? <IoChevronUp /> : <IoChevronDown />}
         </button>
 
+        {/* Stage dropdown */}
         {showStages && (
           <div className="flex flex-col gap-3">
             {stageLinks.map((stage) => (
@@ -91,9 +93,8 @@ const Sidebar = () => {
         )}
 
         {/* Admin-only links */}
-        {user?.isAdmin && adminLinks.map((link) => (
-          <NavLink el={link} key={link.label} />
-        ))}
+        {user?.isAdmin &&
+          adminLinks.map((link) => <NavLink el={link} key={link.label} />)}
       </div>
     </div>
   );

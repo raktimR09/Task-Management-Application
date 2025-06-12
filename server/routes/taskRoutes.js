@@ -20,7 +20,8 @@ import {
   assignMissingUsersToHighPrioritySubtasks,
   getFilePreview,
   trashSubtask,
-  deleteRestoreSubtask
+  deleteRestoreSubtask,
+  getTasksByFilter
 } from "../controllers/taskController.js";
 import { isAdminRoute, protectRoute } from "../middlewares/authMiddleware.js";
 import upload from '../utils/multer.js';
@@ -37,6 +38,7 @@ router.post("/duplicate/:id", protectRoute, isAdminRoute, duplicateTask);
 router.post("/activity/:id", protectRoute, postTaskActivity); 
 
 router.get("/dashboard", protectRoute, dashboardStatistics);
+router.get("/report", protectRoute, isAdminRoute, getTasksByFilter);
 router.get("/", protectRoute, getTasks);
 router.get("/:id", protectRoute, getTask);
 
@@ -68,8 +70,6 @@ router.post('/assign-missing-high/:taskId/:subtaskId', assignMissingUsersToHighP
 
 router.put("/trash-subtask/:subtaskId", protectRoute, isAdminRoute, trashSubtask); // ✅ New route
 router.delete("/delete-restore-subtask/:subtaskId", protectRoute, isAdminRoute, deleteRestoreSubtask); // ✅ New route
-
-
 
 
 export default router;
