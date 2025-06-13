@@ -24,6 +24,7 @@ import ResetPassword from "./pages/ResetPassword";
 import SignUp from "./pages/SignUp";
 import WelcomePage from "./pages/WelcomePage"; // 👈 New import
 import Report from "./pages/Report"; // 👈 Add this line
+import AdminLogin from "./pages/AdminLogin";
 
 
 function Layout() {
@@ -46,7 +47,7 @@ function Layout() {
       </div>
     </div>
   ) : (
-    <Navigate to='/log-in' state={{ from: location }} replace />
+    <Navigate to='/' state={{ from: location }} replace />
   );
 }
 
@@ -105,6 +106,7 @@ function App() {
         {/* Public Routes */}
         <Route path='/' element={<WelcomePage />} />
         <Route path='/log-in' element={<Login />} />
+        <Route path='/admin-login' element={<AdminLogin />} />
         <Route path='/reset-password/:token' element={<ResetPassword />} />
         <Route path='/register' element={<SignUp />} />
 
