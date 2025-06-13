@@ -253,7 +253,7 @@ return (
               label: "IN PROGRESS TASKS",
               total: groupedByStage.inProgress,
               icon: <MdEdit />,
-              bg: "bg-[#FFB823]",
+              bg: "bg-[#CA8A04]",
             },
             {
               _id: "4",

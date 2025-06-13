@@ -12,7 +12,7 @@ export const taskApiSlice=apiSlice.injectEndpoints({
 
         getAlltask:builder.query({
             query:({strQuery,isTrashed,search})=>({
-                url:`/task?stage=${strQuery}&isTrashed=${isTrashed}&serarch=${search}`,
+                url:`/task?stage=${strQuery}&isTrashed=${isTrashed}&search=${search}`,
                 method:"GET",
                 credentials:"include",
             })
@@ -168,12 +168,15 @@ export const taskApiSlice=apiSlice.injectEndpoints({
 
 
 deleteRestoreSubtask: builder.mutation({
-  query: ({ subtaskId, actionType }) => ({
-    url: `/task/delete-restore-subtask/${subtaskId}?actionType=${actionType}`,
-    method: "DELETE",
+  query: ({ taskId, subtaskId, actionType }) => ({
+    url: `/task/${taskId}/subtasks/${subtaskId}?actionType=${actionType}`,
+    method: "PATCH",
     credentials: "include",
   }),
 }),
+
+
+
 
 getReportTasks: builder.query({
   query: ({ startDate, endDate } = {}) => {
@@ -191,6 +194,10 @@ getReportTasks: builder.query({
       credentials: "include",
     };
   },
+}),
+
+getTrashedSubtasks: builder.query({
+  query: () => `/task/trashed-subtasks`,
 }),
 
 
@@ -216,8 +223,9 @@ export const{useGetDashboardStatsQuery,
     useAutoAssignUsersToHighPrioritySubtasksMutation,
     useAssignMissingUsersToHighPrioritySubtasksMutation,
     useGetFilePreviewQuery,
-    useDeleteRestoreSubtaskMutation,
     useTrashSubtaskMutation,
     useGetReportTasksQuery, 
-    useLazyGetReportTasksQuery
+    useLazyGetReportTasksQuery,
+    useGetTrashedSubtasksQuery,
+    useDeleteRestoreSubtaskMutation
 }=taskApiSlice

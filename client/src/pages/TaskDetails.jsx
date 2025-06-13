@@ -234,31 +234,34 @@ const Activities = ({ id, refetch }) => {
     onChange={(e) => setSelectedSubtask(e.target.value)}
   >
     <option value="">-- Select a task --</option>
-    {sortedSubtasks.map((st) => {
-      const isAssigned = st.members?.some((m) => m._id === user?._id);
-      const isDisabled =
-        st.stage === "overdue" || st.stage === "completed" || !isAssigned;
+    {sortedSubtasks
+      .filter((st) => !st.isTrashed) // ✅ Exclude trashed subtasks
+      .map((st) => {
+        const isAssigned = st.members?.some((m) => m._id === user?._id);
+        const isDisabled =
+          st.stage === "overdue" || st.stage === "completed" || !isAssigned;
 
-      return (
-        <option
-          key={st._id}
-          value={st._id}
-          disabled={isDisabled}
-          className={isDisabled ? "text-gray-400" : ""}
-        >
-          {st.title}
-          {st.stage === "overdue"
-            ? " (Overdue)"
-            : st.stage === "completed"
-            ? " (Completed)"
-            : !isAssigned
-            ? " (Not Assigned)"
-            : ""}
-        </option>
-      );
-    })}
+        return (
+          <option
+            key={st._id}
+            value={st._id}
+            disabled={isDisabled}
+            className={isDisabled ? "text-gray-400" : ""}
+          >
+            {st.title}
+            {st.stage === "overdue"
+              ? " (Overdue)"
+              : st.stage === "completed"
+              ? " (Completed)"
+              : !isAssigned
+              ? " (Not Assigned)"
+              : ""}
+          </option>
+        );
+      })}
   </select>
 </label>
+
 
 
           <div className="flex flex-wrap gap-5 mb-4">

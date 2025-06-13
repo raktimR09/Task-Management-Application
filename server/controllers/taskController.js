@@ -261,20 +261,22 @@ export const dashboardStatistics = async (req, res) => {
   }
 };
 
-
 export const getTasks = async (req, res) => {
   try {
-    const { stage, isTrashed } = req.query;
+    const { stage, isTrashed, search } = req.query;
 
-    const query = {};
+    const taskQuery = {};
+
     if (typeof isTrashed !== "undefined") {
-      query.isTrashed = isTrashed === "true";
-    }
-    if (stage) {
-      query.stage = stage;
+      taskQuery.isTrashed = isTrashed === "true";
     }
 
-    let tasks = await Task.find(query)
+    if (stage) {
+      taskQuery.stage = stage;
+    }
+
+    // Get filtered tasks
+    const tasks = await Task.find(taskQuery)
       .populate({
         path: "team",
         select: "name title email",
@@ -285,46 +287,48 @@ export const getTasks = async (req, res) => {
       })
       .sort({ _id: -1 });
 
+    // For trashed subtasks only
+    const allTasks = await Task.find({})
+      .populate({
+        path: "subTasks.members",
+        select: "name fullName email",
+      })
+      .select("title _id subTasks");
+
     const now = new Date();
     const trashedSubtasks = [];
 
-    // Prepare filtered tasks and collect trashed subtasks
-    const filteredTasks = tasks.map((task) => {
-      // Mark overdue tasks
+    const processedTasks = tasks.map((task) => {
       if (task.deadline < now && task.stage !== "completed") {
         task.stage = "overdue";
       }
+      return task;
+    });
 
-      // Split subTasks into active and trashed
-      const activeSubTasks = [];
+    allTasks.forEach((task) => {
       task.subTasks.forEach((sub) => {
         if (sub.isTrashed) {
-          trashedSubtasks.push({
-            ...sub.toObject(),
-            parentTaskTitle: task.title,
-          });
-        } else {
-          activeSubTasks.push(sub);
+          const subWithParent = sub.toObject();
+          subWithParent.parentTaskTitle = task.title;
+          subWithParent.parentTaskId = task._id;
+          trashedSubtasks.push(subWithParent);
         }
       });
-
-      // Replace subTasks with only active ones
-      task.subTasks = activeSubTasks;
-
-      return task;
     });
 
     return res.status(200).json({
       status: true,
-      tasks: filteredTasks,
-      trashedSubtasks,
+      tasks: processedTasks,       // full tasks
+      trashedSubtasks,             // only trashed subtasks, each with parentTaskTitle
     });
   } catch (error) {
-    console.error(error);
-    return res.status(400).json({ status: false, message: error.message });
+    console.error("Error in getTasks:", error);
+    return res.status(400).json({
+      status: false,
+      message: error.message,
+    });
   }
 };
-
 
 
 export const getTask = async (req, res) => {
@@ -939,63 +943,6 @@ export const getFilePreview = async (req, res) => {
 };
 
 
-
-
-
-
-export const deleteRestoreSubtask = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { actionType } = req.query;
-
-    if (!["delete", "deleteAll", "restore", "restoreAll"].includes(actionType)) {
-      return res.status(400).json({ status: false, message: "Invalid action type" });
-    }
-
-    if (actionType === "delete") {
-      const task = await Task.findOne({ "subTasks._id": id });
-      if (!task) return res.status(404).json({ status: false, message: "Subtask not found." });
-
-      task.subTasks = task.subTasks.filter((st) => st._id.toString() !== id);
-      await task.save();
-
-    } else if (actionType === "deleteAll") {
-      const tasks = await Task.find({ "subTasks.isTrashed": true });
-      for (const task of tasks) {
-        task.subTasks = task.subTasks.filter((st) => !st.isTrashed);
-        await task.save();
-      }
-
-    } else if (actionType === "restore") {
-      const task = await Task.findOne({ "subTasks._id": id });
-      if (!task) return res.status(404).json({ status: false, message: "Subtask not found." });
-
-      const sub = task.subTasks.id(id);
-      sub.isTrashed = false;
-      await task.save();
-
-    } else if (actionType === "restoreAll") {
-      const tasks = await Task.find({ "subTasks.isTrashed": true });
-      for (const task of tasks) {
-        task.subTasks.forEach((st) => {
-          if (st.isTrashed) st.isTrashed = false;
-        });
-        await task.save();
-      }
-    }
-
-    return res.status(200).json({
-      status: true,
-      message: `Subtask '${actionType}' action performed successfully.`,
-    });
-
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ status: false, message: error.message });
-  }
-};
-
-
 export const trashSubtask = async (req, res) => {
   try {
     const { subtaskId } = req.params;
@@ -1052,6 +999,84 @@ export const getTasksByFilter = async (req, res) => {
     return res.status(500).json({ message: "Failed to fetch report tasks" });
   }
 };
+
+export const deleteRestoreSubTask = async (req, res) => {
+  try {
+    const { taskId, subtaskId } = req.params;
+    const { actionType } = req.query;
+
+    console.log("➡️ taskId:", taskId);
+    console.log("➡️ subtaskId:", subtaskId);
+    console.log("➡️ actionType:", actionType);
+
+    if (
+      !mongoose.Types.ObjectId.isValid(taskId) ||
+      (subtaskId && !mongoose.Types.ObjectId.isValid(subtaskId))
+    ) {
+      return res.status(400).json({ status: false, message: "Invalid task or subtask ID." });
+    }
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+      return res.status(404).json({ status: false, message: "Task not found." });
+    }
+
+    // 🔁 Process single subtask
+    if (["delete", "restore"].includes(actionType)) {
+      const subTaskIndex = task.subTasks.findIndex(
+        (sub) => sub._id.toString() === subtaskId.toString()
+      );
+
+      if (subTaskIndex === -1) {
+        return res.status(404).json({ status: false, message: "Subtask not found." });
+      }
+
+      if (actionType === "delete") {
+        // 🗑️ Permanently remove subtask
+        task.subTasks.splice(subTaskIndex, 1);
+      } else if (actionType === "restore") {
+        // ♻️ Restore trashed subtask
+        task.subTasks[subTaskIndex].isTrashed = false;
+      }
+    }
+
+    // 🔁 Bulk actions
+    else if (actionType === "deleteAll") {
+      task.subTasks = task.subTasks.filter((sub) => !sub.isTrashed); // remove all trashed subtasks
+    } else if (actionType === "restoreAll") {
+      task.subTasks.forEach((sub) => (sub.isTrashed = false));
+    } else {
+      return res.status(400).json({ status: false, message: "Invalid action type." });
+    }
+
+    await task.save();
+
+    return res.status(200).json({
+      status: true,
+      message: "Subtask operation performed successfully.",
+    });
+
+  } catch (error) {
+    console.error("🔥 Error in deleteRestoreSubTask:", error);
+    return res.status(500).json({ status: false, message: error.message });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
