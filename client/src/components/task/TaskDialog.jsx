@@ -8,12 +8,17 @@ import { RiDeleteBin6Line } from "react-icons/ri";
 import { Menu, Transition } from "@headlessui/react";
 import AddTask from "./AddTask";
 import ConfirmatioDialog from "../Dialogs";
-import { useDuplicateTaskMutation, useTrashTaskMutation } from "../../redux/slices/api/taskApiSlice";
+import {
+  useDuplicateTaskMutation,
+  useTrashTaskMutation,
+} from "../../redux/slices/api/taskApiSlice";
 import { toast } from "sonner";
+import UploadDocument from "./UploadDocument";
 
 const TaskDialog = ({ task }) => {
   const [openEdit, setOpenEdit] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openUpload, setOpenUpload] = useState(false); // ✅ State for UploadDialog
   const navigate = useNavigate();
 
   const [deleteTask] = useTrashTaskMutation();
@@ -46,11 +51,14 @@ const TaskDialog = ({ task }) => {
     }
   };
 
+  const now = new Date();
+  const isOverdue = new Date(task?.deadline) < now;
+
   const items = [];
 
   if (task?.stage === "completed") {
     items.push({
-      label: "Open Task",
+      label: "Open Project",
       icon: <AiTwotoneFolderOpen className="mr-2 h-5 w-5" aria-hidden="true" />,
       onClick: () => navigate(`/task/${task._id}`),
     });
@@ -68,22 +76,23 @@ const TaskDialog = ({ task }) => {
       }
     );
 
+    if (!isOverdue) {
+      items.push({
+        label: "Upload Document",
+        icon: <HiDuplicate className="mr-2 h-5 w-5" aria-hidden="true" />,
+        onClick: () => setOpenUpload(true), // ✅ Open Upload Dialog
+      });
+    }
+
     if (!task?.isLocked) {
-      items.push(
-        {
-          label: "Edit",
-          icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
-          onClick: () => setOpenEdit(true),
-        },
-        {
-          label: "Duplicate",
-          icon: <HiDuplicate className="mr-2 h-5 w-5" aria-hidden="true" />,
-          onClick: () => duplicateHandler(),
-        }
-      );
+      items.push({
+        label: "Edit",
+        icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
+        onClick: () => setOpenEdit(true),
+      });
     } else {
       items.push({
-        label: "Extend Task",
+        label: "Extend Project",
         icon: <MdOutlineEdit className="mr-2 h-5 w-5" aria-hidden="true" />,
         onClick: () => setOpenEdit(true),
       });
@@ -142,6 +151,9 @@ const TaskDialog = ({ task }) => {
         setOpen={setOpenDialog}
         onClick={deleteHandler}
       />
+
+      {/* ✅ UploadDocument Modal */}
+      <UploadDocument open={openUpload} setOpen={setOpenUpload} taskId={task._id} />
     </>
   );
 };
