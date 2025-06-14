@@ -34,7 +34,7 @@ const WelcomePage = () => {
             onClick={() => navigate("/register")}
             className="bg-gray-300 hover:bg-gray-400 text-gray-900 text-lg font-semibold py-3 px-6 rounded-xl transition-all duration-300"
           >
-            Create Account
+            User Registration
           </button>
         </div>
 

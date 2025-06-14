@@ -62,7 +62,7 @@ const Tasks = () => {
   ) : (
     <div className='w-full'>
       <div className='flex items-center justify-between mb-4'>
-        <Title title={status ? `${status} Tasks` : "Projects"} />
+        <Title title={status ? `${status} Projects` : "Projects"} />
 
         {!status && (
           <Button
