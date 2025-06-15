@@ -24,15 +24,22 @@ const Login = () => {
   }, [user]);
 
   const onSubmit = async (data) => {
-    try {
-      const res = await login(data).unwrap();
-      dispatch(setCredentials(res));
-      toast.success("Login successful!");
-      navigate('/');
-    } catch (error) {
-      toast.error("Invalid credentials.");
+  try {
+    const res = await login(data).unwrap();
+
+    if (res.isAdmin) {
+      toast.error("Admin users are not allowed to login from here.");
+      return;
     }
-  };
+
+    dispatch(setCredentials(res));
+    toast.success("Login successful!");
+    navigate('/');
+  } catch (error) {
+    toast.error("Invalid credentials.");
+  }
+};
+
 
   const handleForgotPassword = async (data) => {
     try {

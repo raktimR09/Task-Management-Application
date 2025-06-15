@@ -384,7 +384,7 @@ export const createSubTask = async (req, res) => {
     if (subtaskDeadline > taskDeadline) {
       return res.status(400).json({
         status: false,
-        message: "Subtask deadline cannot be later than task deadline.",
+        message: "Task deadline cannot be later than Project deadline.",
       });
     }
 
@@ -410,7 +410,7 @@ export const createSubTask = async (req, res) => {
 
     await task.save();
 
-    res.status(200).json({ status: true, message: "SubTask added successfully." });
+    res.status(200).json({ status: true, message: "Task added successfully." });
   } catch (error) {
     console.log(error);
     return res.status(400).json({ status: false, message: error.message });
@@ -424,7 +424,7 @@ export const updateSubTask = async (req, res) => {
   try {
     const task = await Task.findOne({ "subTasks._id": id });
     if (!task) {
-      return res.status(404).json({ message: "Subtask not found (parent task missing)" });
+      return res.status(404).json({ message: "Task not found (Project missing)" });
     }
 
     // Validate subtask deadline against parent task deadline
@@ -434,20 +434,20 @@ export const updateSubTask = async (req, res) => {
 
       if (subtaskDeadline > parentDeadline) {
         return res.status(400).json({
-          message: "Subtask deadline cannot be later than task deadline.",
+          message: "Task deadline cannot be later than Project deadline.",
         });
       }
     }
 
     if (task.isLocked) {
       return res.status(403).json({
-        message: "Task is locked (overdue) and cannot be edited.",
+        message: "Project is locked (overdue) and cannot be edited.",
       });
     }
 
     const subtask = task.subTasks.id(id);
     if (!subtask) {
-      return res.status(404).json({ message: "Subtask not found" });
+      return res.status(404).json({ message: "Task not found" });
     }
 
     const wasExpired = subtask.stage === "overdue";
